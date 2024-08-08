@@ -7,6 +7,10 @@ mkdir common-crawl-pipeline
 cd common-crawl-pipeline
 git init
 cargo new pipeline
+cd pipeline
+mkdir src/bin
+cp src/main.rs src/bin/batcher.rs
+cp src/main.rs src/bin/worker.rs
 ```
 
 ## Steps
@@ -38,8 +42,24 @@ cargo add reqwest
 cargo add tokio --features macros,rt-multi-thread
 ```
 
+## Requirements for students
+
+- Docker installed on their machine so that they can run containers
+- Rust book can be looked into beforehand: https://doc.rust-lang.org/book/
+- 100 exercises to learn Rust: https://github.com/mainmatter/100-exercises-to-learn-rust/tree/main
+
 
 ## Ideas
+
+I think I should start the day with a presentation that gives an overview over common crawl
+and the goal of the pipeline. I can basically reuse my presentation from Berlin.
+
+After that introduction I can set up a rust project and show them how I would start such a project.
+This should only take one hour. I can just paste the code to download and unzip a file into main.
+Then I realize that I want to do this more often and can therefore refactor.
+Then I can realize that I can reuse the client and make a structure with member functions.
+
+Later during the project, the students should set up the following things for metrics and message passing:
 
 - autometrics
 - local rabbitmq server
