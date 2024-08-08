@@ -1,0 +1,9 @@
+[package]
+name = "pipeline"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+flate2 = "1.0.31"
+reqwest = "0.12.5"
+tokio = { version = "1.39.2", features = ["macros", "rt-multi-thread"] }
