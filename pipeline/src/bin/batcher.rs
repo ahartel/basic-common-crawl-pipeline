@@ -21,6 +21,8 @@ async fn download_and_unzip(url: &str) -> Result<Vec<String>, anyhow::Error> {
     }
 }
 
+const BATCH_SIZE: usize = 1000;
+
 #[tokio::main]
 async fn main() {
     let paths = download_and_unzip(
@@ -30,13 +32,24 @@ async fn main() {
     .unwrap();
     for path in paths {
         if path.contains("cdx-") {
-            let cdx_content = download_and_unzip(&format!("https://data.commoncrawl.org/{path}"))
-                .await
-                .unwrap();
-            let cdx_entries = cdx_content
-                .iter()
-                .map(|s| parse_cdx_line(s))
-                .collect::<Vec<_>>();
+            let english_cdx_entries =
+                download_and_unzip(&format!("https://data.commoncrawl.org/{path}"))
+                    .await
+                    .unwrap()
+                    .iter()
+                    .map(|s| parse_cdx_line(s))
+                    .filter(|e| {
+                        if let Some(languages) = e.metadata.languages.as_ref() {
+                            languages.contains("eng")
+                        } else {
+                            false
+                        }
+                    })
+                    .collect::<Vec<_>>();
+            english_cdx_entries
+                .as_slice()
+                .chunks(BATCH_SIZE)
+                .for_each(|chunk| todo!());
             break;
         }
         println!("{}", path);
