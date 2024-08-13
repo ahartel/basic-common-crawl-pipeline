@@ -42,6 +42,29 @@ cargo add reqwest
 cargo add tokio --features macros,rt-multi-thread
 ```
 
+## Prepare rabbitMQ server
+
+Start the server like this:
+
+```bash
+docker run -d -P --name rabbitmq rabbitmq:management
+```
+
+Find out which port maps to the management interface (15672) and the AMQP port (5672):
+```bash
+docker ps
+```
+
+Remember both ports. The management interface is useful for debugging and monitoring the queue.
+This can be used by pointing your browser to `localhost:PORT`.
+
+The AMQP port is used by our Rust binary to connect to the server.
+For this to work, you need to export this:
+
+```bash
+export RABBITMQ_CONNECTION_STRING=amqp://localhost:PORT
+```
+
 ## Requirements for students
 
 - Docker installed on their machine so that they can run containers
@@ -62,4 +85,10 @@ Then I can realize that I can reuse the client and make a structure with member 
 Later during the project, the students should set up the following things for metrics and message passing:
 
 - autometrics
+
+To motivate autometrics and metrics collection in general, I should add a screenshot of our
+Grafana dashboard to my presentation.
+
 - local rabbitmq server
+
+This is for inter-process communication and should become clear from the architecture diagram.

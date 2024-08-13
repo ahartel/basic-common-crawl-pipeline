@@ -1,6 +1,12 @@
-use std::io::Read;
+use std::{io::Read, time::Duration};
 
-use serde::Deserialize;
+use anyhow::Context;
+use lapin::{
+    options::{BasicPublishOptions, BasicQosOptions, QueueDeclareOptions},
+    types::FieldTable,
+    BasicProperties, Channel, Connection, ConnectionProperties, Queue,
+};
+use serde::{Deserialize, Serialize};
 
 async fn download_and_unzip(url: &str) -> Result<Vec<String>, anyhow::Error> {
     let client = reqwest::Client::new();
@@ -22,9 +28,72 @@ async fn download_and_unzip(url: &str) -> Result<Vec<String>, anyhow::Error> {
 }
 
 const BATCH_SIZE: usize = 1000;
+pub const CC_QUEUE_NAME: &str = "batches";
+const RABBIT_MQ_TIMEOUT: Duration = Duration::from_secs(20);
+
+pub fn get_rabbitmq_connection_string() -> String {
+    std::env::var("RABBITMQ_CONNECTION_STRING").expect("RABBITMQ_CONNECTION_STRING must be set.")
+}
+
+pub async fn rabbitmq_connection() -> Result<Connection, anyhow::Error> {
+    let connection_string = get_rabbitmq_connection_string();
+    let connection = tokio::time::timeout(
+        RABBIT_MQ_TIMEOUT,
+        Connection::connect(&connection_string, ConnectionProperties::default()),
+    )
+    .await
+    .context("Timed out while trying to connect to RabbitMQ")??;
+    Ok(connection)
+}
+
+pub async fn rabbitmq_channel_with_queue(
+    conn: &Connection,
+    queue_name: &str,
+) -> Result<(Channel, Queue), anyhow::Error> {
+    let channel = rabbitmq_channel(conn).await?;
+    let queue = rabbitmq_declare_queue(&channel, queue_name, FieldTable::default()).await?;
+    Ok((channel, queue))
+}
+
+pub async fn rabbitmq_declare_queue(
+    channel: &Channel,
+    queue_name: &str,
+    arguments: FieldTable,
+) -> Result<Queue, anyhow::Error> {
+    let queue = tokio::time::timeout(
+        RABBIT_MQ_TIMEOUT,
+        channel.queue_declare(queue_name, QueueDeclareOptions::default(), arguments),
+    )
+    .await
+    .context("Timed out while trying to declare a RabbitMQ queue")?
+    .context("Failed to declare RabbitMQ queue")?;
+
+    Ok(queue)
+}
+
+pub async fn rabbitmq_channel(conn: &Connection) -> Result<Channel, anyhow::Error> {
+    let channel = tokio::time::timeout(RABBIT_MQ_TIMEOUT, conn.create_channel())
+        .await
+        .context("Timed out while trying to create a RabbitMQ channel")?
+        .context("Failed to create RabbitMQ channel")?;
+
+    tokio::time::timeout(
+        RABBIT_MQ_TIMEOUT,
+        channel.basic_qos(1, BasicQosOptions::default()),
+    )
+    .await
+    .context("Timed out while trying to set QoS on the channel")?
+    .context("Failed to set QoS on the channel")?;
+    Ok(channel)
+}
 
 #[tokio::main]
 async fn main() {
+    let rabbit_conn = rabbitmq_connection().await.unwrap();
+    let (channel, _queue) = rabbitmq_channel_with_queue(&rabbit_conn, CC_QUEUE_NAME)
+        .await
+        .unwrap();
+
     let paths = download_and_unzip(
         "https://data.commoncrawl.org/crawl-data/CC-MAIN-2024-30/cc-index.paths.gz",
     )
@@ -46,17 +115,27 @@ async fn main() {
                         }
                     })
                     .collect::<Vec<_>>();
-            english_cdx_entries
-                .as_slice()
-                .chunks(BATCH_SIZE)
-                .for_each(|chunk| todo!());
+            for batch in english_cdx_entries.as_slice().chunks(BATCH_SIZE) {
+                println!("Sending a batch of {} entries", batch.len());
+                channel
+                    .basic_publish(
+                        "",
+                        CC_QUEUE_NAME,
+                        BasicPublishOptions::default(),
+                        &serde_json::to_vec(&batch).unwrap(),
+                        BasicProperties::default(),
+                    )
+                    .await
+                    .context("rabbitmq basic publish")
+                    .unwrap();
+            }
             break;
         }
         println!("{}", path);
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct CdxMetadata {
     url: String,
     status: String,
@@ -66,6 +145,7 @@ struct CdxMetadata {
     languages: Option<String>,
 }
 
+#[derive(Debug, Serialize)]
 struct CdxEntry {
     surt_url: String,
     timestamp: String,
