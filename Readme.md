@@ -11,17 +11,25 @@ cd pipeline
 mkdir src/bin
 cp src/main.rs src/bin/batcher.rs
 cp src/main.rs src/bin/worker.rs
+cargo add flate2
+cargo add reqwest
+cargo add tokio --features macros,rt-multi-thread
+cargo add clap --features derive
+```
 ```
 
 ## Steps
 
 First, we download the Common Crawl index file for one crawl:
-https://data.commoncrawl.org/cc-index/collections/CC-MAIN-2024-30/indexes/cluster.idx.
+```bash
+wget https://data.commoncrawl.org/cc-index/collections/CC-MAIN-2024-30/indexes/cluster.idx
+```
 
 This file contains the alphabetical URL ranges of all the WARC files in the crawl.
-I think this might not be necessary for our case. Seems to become relevant once we want to
-scale up to multiple crawls.
+This is not strictly necessary for our case.
+But it helps with downloading smaller file chunks so that we can actually see some progress.
 
+This is how this file looks:
 ```
 0,100,22,165)/ 20240722120756   cdx-00000.gz    0       188224  1
 101,141,199,66)/robots.txt 20240714155331       cdx-00000.gz    188224  178351  2
@@ -30,17 +38,9 @@ scale up to multiple crawls.
 109,77,250,142)/url?q=https://batmanapollo.ru 20240722133024    cdx-00000.gz    726229  181656  5
 ```
 
-Therefore, the first thing our code needs to do is to download the actual cdx files from the crawl.
-To find out which of these files there are, we must download this file:
-https://data.commoncrawl.org/crawl-data/CC-MAIN-2024-30/cc-index.paths.gz
+The first thing our code needs to do is to download the actual cdx file chunks from the crawl.
 
 Use the `reqwest` crate to download the file, the `flate2` crate to unzip and `tokio` as async runtime.
-
-```bash
-cargo add flate2
-cargo add reqwest
-cargo add tokio --features macros,rt-multi-thread
-```
 
 ## Prepare rabbitMQ server
 

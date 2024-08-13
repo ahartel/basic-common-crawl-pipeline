@@ -1,76 +1,115 @@
-use std::io::Read;
+use std::{fs, io::Read};
 
 use anyhow::Context;
+use clap::Parser;
 use lapin::{options::BasicPublishOptions, BasicProperties};
 use pipeline::rabbitmq::{
     rabbitmq_channel_with_queue, rabbitmq_connection, BATCH_SIZE, CC_QUEUE_NAME,
 };
 use serde::{Deserialize, Serialize};
 
-async fn download_and_unzip(url: &str) -> Result<Vec<String>, anyhow::Error> {
+async fn download_and_unzip(
+    url: &str,
+    offset: usize,
+    length: usize,
+) -> Result<Vec<String>, anyhow::Error> {
     let client = reqwest::Client::new();
-    let res = client.get(url).send().await.unwrap();
+    let res = client
+        .get(url)
+        .header("Range", format!("bytes={}-{}", offset, offset + length - 1))
+        .send()
+        .await
+        .unwrap();
     match res.status() {
-        reqwest::StatusCode::OK => {
+        reqwest::StatusCode::PARTIAL_CONTENT => {
             let body = res.bytes().await.unwrap();
+            println!(
+                "Successfully fetched the URL {} from {} to {}",
+                url,
+                offset,
+                offset + length - 1
+            );
             let mut decoder = flate2::read::GzDecoder::new(&body[..]);
             let mut buffer = Vec::new();
             decoder.read_to_end(&mut buffer).unwrap();
             let paths = String::from_utf8(buffer).unwrap();
             Ok(paths.lines().map(|s| s.to_string()).collect())
         }
-        _ => {
-            println!("Failed to fetch the index file");
-            Err(anyhow::anyhow!("Failed to fetch the index file"))
-        }
+        _ => Err(anyhow::anyhow!(
+            "Failed to fetch index file {}: {}",
+            url,
+            res.status()
+        )),
     }
+}
+
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    #[arg(short, long)]
+    cluster_idx_filename: String,
+
+    #[arg(short, long)]
+    num_cdx_chunks_to_process: Option<usize>,
 }
 
 #[tokio::main]
 async fn main() {
+    let args = Args::parse();
+
     let rabbit_conn = rabbitmq_connection().await.unwrap();
     let (channel, _queue) = rabbitmq_channel_with_queue(&rabbit_conn, CC_QUEUE_NAME)
         .await
         .unwrap();
 
-    let paths = download_and_unzip(
-        "https://data.commoncrawl.org/crawl-data/CC-MAIN-2024-30/cc-index.paths.gz",
-    )
-    .await
-    .unwrap();
-    for path in paths {
-        if path.contains("cdx-") {
-            let english_cdx_entries =
-                download_and_unzip(&format!("https://data.commoncrawl.org/{path}"))
-                    .await
-                    .unwrap()
-                    .iter()
-                    .map(|s| parse_cdx_line(s))
-                    .filter(|e| {
-                        if let Some(languages) = e.metadata.languages.as_ref() {
-                            languages.contains("eng")
-                        } else {
-                            false
-                        }
-                    })
-                    .collect::<Vec<_>>();
-            for batch in english_cdx_entries.as_slice().chunks(BATCH_SIZE) {
-                println!("Sending a batch of {} entries", batch.len());
-                channel
-                    .basic_publish(
-                        "",
-                        CC_QUEUE_NAME,
-                        BasicPublishOptions::default(),
-                        &serde_json::to_vec(&batch).unwrap(),
-                        BasicProperties::default(),
-                    )
-                    .await
-                    .context("rabbitmq basic publish")
-                    .unwrap();
+    let idx = fs::read_to_string(args.cluster_idx_filename)
+        .expect("Should have been able to read the file")
+        .lines()
+        .map(parse_cluster_idx)
+        .collect::<Vec<_>>();
+
+    let mut num_cdx_chunks_processed: usize = 0;
+    for cdx_chunk in idx {
+        let english_cdx_entries = download_and_unzip(
+            &format!(
+                "https://data.commoncrawl.org/cc-index/collections/CC-MAIN-2024-30/indexes/{}",
+                cdx_chunk.cdx_filename
+            ),
+            cdx_chunk.cdx_offset,
+            cdx_chunk.cdx_length,
+        )
+        .await
+        .unwrap()
+        .iter()
+        .map(|s| parse_cdx_line(s))
+        .filter(|e| {
+            if let Some(languages) = e.metadata.languages.as_ref() {
+                languages.contains("eng")
+            } else {
+                false
             }
-            break;
+        })
+        .collect::<Vec<_>>();
+        for batch in english_cdx_entries.as_slice().chunks(BATCH_SIZE) {
+            println!("Sending a batch of {} entries", batch.len());
+            channel
+                .basic_publish(
+                    "",
+                    CC_QUEUE_NAME,
+                    BasicPublishOptions::default(),
+                    &serde_json::to_vec(&batch).unwrap(),
+                    BasicProperties::default(),
+                )
+                .await
+                .context("rabbitmq basic publish")
+                .unwrap();
         }
-        println!("{}", path);
+        num_cdx_chunks_processed += 1;
+        if let Some(to_process) = args.num_cdx_chunks_to_process {
+            if to_process == num_cdx_chunks_processed {
+                break;
+            }
+        }
     }
 }
 
@@ -101,23 +140,23 @@ fn parse_cdx_line(line: &str) -> CdxEntry {
 }
 
 struct ClusterIdxEntry {
-    surt_url: String,
-    timestamp: String,
+    _surt_url: String,
+    _timestamp: String,
     cdx_filename: String,
     cdx_offset: usize,
     cdx_length: usize,
-    cluster_id: String,
+    _cluster_id: String,
 }
 
 fn parse_cluster_idx(line: &str) -> ClusterIdxEntry {
     let mut idx = line.split_whitespace();
     ClusterIdxEntry {
-        surt_url: idx.next().unwrap().to_string(),
-        timestamp: idx.next().unwrap().to_string(),
+        _surt_url: idx.next().unwrap().to_string(),
+        _timestamp: idx.next().unwrap().to_string(),
         cdx_filename: idx.next().unwrap().to_string(),
         cdx_offset: idx.next().unwrap().parse().unwrap(),
         cdx_length: idx.next().unwrap().parse().unwrap(),
-        cluster_id: idx.next().unwrap().to_string(),
+        _cluster_id: idx.next().unwrap().to_string(),
     }
 }
 
