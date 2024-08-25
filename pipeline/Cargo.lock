@@ -2018,6 +2018,7 @@ dependencies = [
  "axum",
  "clap",
  "flate2",
+ "futures-util",
  "lapin",
  "reqwest",
  "serde",

@@ -1,17 +1,14 @@
 use std::{fs, io::Read};
 
 use anyhow::Context;
-use autometrics::{
-    autometrics,
-    prometheus_exporter::{self, PrometheusResponse},
-};
+use autometrics::autometrics;
 use clap::Parser;
 use lapin::{options::BasicPublishOptions, BasicProperties};
-use pipeline::rabbitmq::{
-    rabbitmq_channel_with_queue, rabbitmq_connection, BATCH_SIZE, CC_QUEUE_NAME,
+use pipeline::{
+    cdx::CdxEntry,
+    rabbitmq::{rabbitmq_channel_with_queue, rabbitmq_connection, BATCH_SIZE, CC_QUEUE_NAME},
+    tracing_and_metrics::{run_metrics_server, setup_tracing},
 };
-use serde::{Deserialize, Serialize};
-use tracing_subscriber::EnvFilter;
 
 #[autometrics]
 async fn download_and_unzip(
@@ -57,30 +54,6 @@ struct Args {
 
     #[arg(short, long)]
     num_cdx_chunks_to_process: Option<usize>,
-}
-
-// A small API server that exposes metrics on `/metrics` using `axum`.
-async fn run_metrics_server(port: u16) {
-    prometheus_exporter::init();
-
-    async fn metrics() -> PrometheusResponse {
-        prometheus_exporter::encode_http_response()
-    }
-
-    let app = axum::Router::new().route("/metrics", axum::routing::get(metrics));
-    let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{port}"))
-        .await
-        .unwrap();
-    axum::serve(listener, app).await.unwrap();
-}
-
-fn setup_tracing() {
-    // construct a subscriber that prints formatted traces to stdout
-    let filter = EnvFilter::from_default_env();
-    let subscriber = tracing_subscriber::fmt().with_env_filter(filter).finish();
-    // use that subscriber to process traces emitted after this point
-    tracing::subscriber::set_global_default(subscriber).unwrap();
-    tracing::info!("Tracing initialized");
 }
 
 #[tokio::main]
@@ -144,23 +117,6 @@ async fn main() {
             }
         }
     }
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct CdxMetadata {
-    url: String,
-    status: String,
-    length: String,
-    offset: String,
-    filename: String,
-    languages: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-struct CdxEntry {
-    surt_url: String,
-    timestamp: String,
-    metadata: CdxMetadata,
 }
 
 fn parse_cdx_line(line: &str) -> CdxEntry {

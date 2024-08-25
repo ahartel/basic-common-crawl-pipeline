@@ -9,6 +9,7 @@ autometrics = { version = "2.0.0", features = ["prometheus-exporter"] }
 axum = "0.7.5"
 clap = { version = "4.5.15", features = ["derive"] }
 flate2 = "1.0.31"
+futures-util = "0.3.30"
 lapin = "2.5.0"
 reqwest = "0.12.5"
 serde = { version = "1.0.205", features = ["derive"] }

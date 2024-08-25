@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use anyhow::Context;
 use lapin::{
-    options::{BasicQosOptions, QueueDeclareOptions},
+    options::{BasicConsumeOptions, BasicQosOptions, QueueDeclareOptions},
     types::FieldTable,
     Channel, Connection, ConnectionProperties, Queue,
 };
@@ -67,4 +67,24 @@ pub async fn rabbitmq_channel(conn: &Connection) -> Result<Channel, anyhow::Erro
     .context("Timed out while trying to set QoS on the channel")?
     .context("Failed to set QoS on the channel")?;
     Ok(channel)
+}
+
+pub async fn rabbitmq_consumer(
+    channel: &Channel,
+    queue_name: &str,
+    consumer_tag: &str,
+) -> Result<lapin::Consumer, anyhow::Error> {
+    let consumer = tokio::time::timeout(
+        RABBIT_MQ_TIMEOUT,
+        channel.basic_consume(
+            queue_name,
+            consumer_tag,
+            BasicConsumeOptions::default(),
+            FieldTable::default(),
+        ),
+    )
+    .await
+    .context("Timed out while trying to consume from a RabbitMQ queue")??;
+
+    Ok(consumer)
 }
