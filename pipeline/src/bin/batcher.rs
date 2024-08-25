@@ -1,13 +1,19 @@
 use std::{fs, io::Read};
 
 use anyhow::Context;
+use autometrics::{
+    autometrics,
+    prometheus_exporter::{self, PrometheusResponse},
+};
 use clap::Parser;
 use lapin::{options::BasicPublishOptions, BasicProperties};
 use pipeline::rabbitmq::{
     rabbitmq_channel_with_queue, rabbitmq_connection, BATCH_SIZE, CC_QUEUE_NAME,
 };
 use serde::{Deserialize, Serialize};
+use tracing_subscriber::EnvFilter;
 
+#[autometrics]
 async fn download_and_unzip(
     url: &str,
     offset: usize,
@@ -23,7 +29,7 @@ async fn download_and_unzip(
     match res.status() {
         reqwest::StatusCode::PARTIAL_CONTENT => {
             let body = res.bytes().await.unwrap();
-            println!(
+            tracing::info!(
                 "Successfully fetched the URL {} from {} to {}",
                 url,
                 offset,
@@ -46,16 +52,42 @@ async fn download_and_unzip(
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    #[arg(short, long)]
+    #[arg(short, long, default_value = "cluster.idx")]
     cluster_idx_filename: String,
 
     #[arg(short, long)]
     num_cdx_chunks_to_process: Option<usize>,
 }
 
+// A small API server that exposes metrics on `/metrics` using `axum`.
+async fn run_metrics_server(port: u16) {
+    prometheus_exporter::init();
+
+    async fn metrics() -> PrometheusResponse {
+        prometheus_exporter::encode_http_response()
+    }
+
+    let app = axum::Router::new().route("/metrics", axum::routing::get(metrics));
+    let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{port}"))
+        .await
+        .unwrap();
+    axum::serve(listener, app).await.unwrap();
+}
+
+fn setup_tracing() {
+    // construct a subscriber that prints formatted traces to stdout
+    let filter = EnvFilter::from_default_env();
+    let subscriber = tracing_subscriber::fmt().with_env_filter(filter).finish();
+    // use that subscriber to process traces emitted after this point
+    tracing::subscriber::set_global_default(subscriber).unwrap();
+    tracing::info!("Tracing initialized");
+}
+
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
+    setup_tracing();
+    tokio::task::spawn(run_metrics_server(9000));
 
     let rabbit_conn = rabbitmq_connection().await.unwrap();
     let (channel, _queue) = rabbitmq_channel_with_queue(&rabbit_conn, CC_QUEUE_NAME)
@@ -70,6 +102,7 @@ async fn main() {
 
     let mut num_cdx_chunks_processed: usize = 0;
     for cdx_chunk in idx {
+        print!(".");
         let english_cdx_entries = download_and_unzip(
             &format!(
                 "https://data.commoncrawl.org/cc-index/collections/CC-MAIN-2024-30/indexes/{}",
@@ -91,7 +124,7 @@ async fn main() {
         })
         .collect::<Vec<_>>();
         for batch in english_cdx_entries.as_slice().chunks(BATCH_SIZE) {
-            println!("Sending a batch of {} entries", batch.len());
+            tracing::info!("Sending a batch of {} entries", batch.len());
             channel
                 .basic_publish(
                     "",

@@ -15,6 +15,7 @@ pub fn get_rabbitmq_connection_string() -> String {
     std::env::var("RABBITMQ_CONNECTION_STRING").expect("RABBITMQ_CONNECTION_STRING must be set.")
 }
 
+#[tracing::instrument]
 pub async fn rabbitmq_connection() -> Result<Connection, anyhow::Error> {
     let connection_string = get_rabbitmq_connection_string();
     let connection = tokio::time::timeout(
@@ -26,6 +27,7 @@ pub async fn rabbitmq_connection() -> Result<Connection, anyhow::Error> {
     Ok(connection)
 }
 
+#[tracing::instrument]
 pub async fn rabbitmq_channel_with_queue(
     conn: &Connection,
     queue_name: &str,
