@@ -11,6 +11,10 @@ cd pipeline
 mkdir src/bin
 cp src/main.rs src/bin/batcher.rs
 cp src/main.rs src/bin/worker.rs
+```
+
+Install rust dependencies:
+```
 cargo add flate2
 cargo add reqwest
 cargo add tokio --features macros,rt-multi-thread
@@ -21,8 +25,18 @@ cargo add tracing
 cargo add tracing-subscriber --features env-filter
 cargo add serde-aux
 cargo add warc
+cargo add pyo3 --features auto-initialize
+cargo add once_cell
 ```
+
+Install Python dependencies:
 ```
+python -m venv venv
+source venv/bin/activate
+pip install trafilatura
+export PYTHONPATH=venv/lib/python3.*/site-packages
+```
+
 
 ## Steps
 

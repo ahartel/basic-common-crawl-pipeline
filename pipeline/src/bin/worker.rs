@@ -6,6 +6,7 @@ use pipeline::{
         rabbitmq_channel_with_queue, rabbitmq_connection, rabbitmq_consumer, CC_QUEUE_NAME,
     },
     tracing_and_metrics::{run_metrics_server, setup_tracing},
+    trafilatura,
 };
 use warc::WarcHeader;
 
@@ -39,10 +40,31 @@ async fn main() {
                     .unwrap();
                     for warc_entry in warc::WarcReader::new(data.as_slice()).iter_records() {
                         let warc_entry = warc_entry.unwrap();
+                        if warc_entry.header(WarcHeader::WarcType).unwrap() != "response" {
+                            continue;
+                        }
                         tracing::info!(
                             "Successfully read WARC entry with URL {}",
                             warc_entry.header(WarcHeader::TargetURI).unwrap()
                         );
+                        let raw_content = String::from_utf8_lossy(warc_entry.body());
+                        let html_begin_index = raw_content.find("\n\n");
+                        let Some(html_begin_index) = html_begin_index else {
+                            tracing::warn!("Failed to find HTML content in WARC entry");
+                            continue;
+                        };
+                        tracing::debug!(
+                            "First 2000 characters of raw content: {}",
+                            &raw_content[..2000]
+                        );
+                        let content =
+                            trafilatura::extract(&raw_content[html_begin_index..]).unwrap();
+                        if let Some(content) = content {
+                            tracing::info!("Extracted content of length {}", content.len());
+                            tracing::debug!("Extracted content: {}", &content);
+                        } else {
+                            tracing::warn!("Failed to extract content from WARC entry");
+                        }
                     }
                 }
                 delivery.ack(BasicAckOptions::default()).await.unwrap();
