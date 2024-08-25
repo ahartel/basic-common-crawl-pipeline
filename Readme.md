@@ -19,6 +19,8 @@ cargo add autometrics --features prometheus-exporter
 cargo add axum
 cargo add tracing
 cargo add tracing-subscriber --features env-filter
+cargo add serde-aux
+cargo add warc
 ```
 ```
 

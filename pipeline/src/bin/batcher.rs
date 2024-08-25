@@ -1,50 +1,12 @@
-use std::{fs, io::Read};
-
 use anyhow::Context;
-use autometrics::autometrics;
 use clap::Parser;
 use lapin::{options::BasicPublishOptions, BasicProperties};
 use pipeline::{
-    cdx::CdxEntry,
+    cdx::{download_and_unzip, CdxEntry},
     rabbitmq::{rabbitmq_channel_with_queue, rabbitmq_connection, BATCH_SIZE, CC_QUEUE_NAME},
     tracing_and_metrics::{run_metrics_server, setup_tracing},
 };
-
-#[autometrics]
-async fn download_and_unzip(
-    url: &str,
-    offset: usize,
-    length: usize,
-) -> Result<Vec<String>, anyhow::Error> {
-    let client = reqwest::Client::new();
-    let res = client
-        .get(url)
-        .header("Range", format!("bytes={}-{}", offset, offset + length - 1))
-        .send()
-        .await
-        .unwrap();
-    match res.status() {
-        reqwest::StatusCode::PARTIAL_CONTENT => {
-            let body = res.bytes().await.unwrap();
-            tracing::info!(
-                "Successfully fetched the URL {} from {} to {}",
-                url,
-                offset,
-                offset + length - 1
-            );
-            let mut decoder = flate2::read::GzDecoder::new(&body[..]);
-            let mut buffer = Vec::new();
-            decoder.read_to_end(&mut buffer).unwrap();
-            let paths = String::from_utf8(buffer).unwrap();
-            Ok(paths.lines().map(|s| s.to_string()).collect())
-        }
-        _ => Err(anyhow::anyhow!(
-            "Failed to fetch index file {}: {}",
-            url,
-            res.status()
-        )),
-    }
-}
+use std::fs;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -76,21 +38,24 @@ async fn main() {
     let mut num_cdx_chunks_processed: usize = 0;
     for cdx_chunk in idx {
         print!(".");
-        let english_cdx_entries = download_and_unzip(
-            &format!(
-                "https://data.commoncrawl.org/cc-index/collections/CC-MAIN-2024-30/indexes/{}",
-                cdx_chunk.cdx_filename
-            ),
-            cdx_chunk.cdx_offset,
-            cdx_chunk.cdx_length,
+        let english_cdx_entries = String::from_utf8(
+            download_and_unzip(
+                &format!(
+                    "https://data.commoncrawl.org/cc-index/collections/CC-MAIN-2024-30/indexes/{}",
+                    cdx_chunk.cdx_filename
+                ),
+                cdx_chunk.cdx_offset,
+                cdx_chunk.cdx_length,
+            )
+            .await
+            .unwrap(),
         )
-        .await
         .unwrap()
-        .iter()
-        .map(|s| parse_cdx_line(s))
+        .lines()
+        .map(parse_cdx_line)
         .filter(|e| {
             if let Some(languages) = e.metadata.languages.as_ref() {
-                languages.contains("eng")
+                languages.contains("eng") && e.metadata.status == 200
             } else {
                 false
             }
