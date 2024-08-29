@@ -40,6 +40,15 @@ pip install trafilatura
 export PYTHONPATH=venv/lib/python3.*/site-packages
 ```
 
+Run the batcher:
+```bash
+cargo run --bin batcher -- --cluster-idx-filename <CLUSTER_IDX_FILENAME>
+```
+
+Run the worker:
+```bash
+cargo run --bin worker
+```
 
 ## Steps
 
