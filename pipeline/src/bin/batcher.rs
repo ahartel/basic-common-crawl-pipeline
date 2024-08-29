@@ -32,7 +32,7 @@ async fn main() {
     let idx = fs::read_to_string(args.cluster_idx_filename)
         .expect("Should have been able to read the file")
         .lines()
-        .map(parse_cluster_idx)
+        .filter_map(parse_cluster_idx)
         .collect::<Vec<_>>();
 
     let mut num_cdx_chunks_processed: usize = 0;
@@ -102,16 +102,16 @@ struct ClusterIdxEntry {
     _cluster_id: String,
 }
 
-fn parse_cluster_idx(line: &str) -> ClusterIdxEntry {
+fn parse_cluster_idx(line: &str) -> Option<ClusterIdxEntry> {
     let mut idx = line.split_whitespace();
-    ClusterIdxEntry {
-        _surt_url: idx.next().unwrap().to_string(),
-        _timestamp: idx.next().unwrap().to_string(),
-        cdx_filename: idx.next().unwrap().to_string(),
-        cdx_offset: idx.next().unwrap().parse().unwrap(),
-        cdx_length: idx.next().unwrap().parse().unwrap(),
-        _cluster_id: idx.next().unwrap().to_string(),
-    }
+    Some(ClusterIdxEntry {
+        _surt_url: idx.next()?.to_string(),
+        _timestamp: idx.next()?.to_string(),
+        cdx_filename: idx.next()?.to_string(),
+        cdx_offset: idx.next()?.parse().unwrap(),
+        cdx_length: idx.next()?.parse().unwrap(),
+        _cluster_id: idx.next()?.to_string(),
+    })
 }
 
 #[cfg(test)]

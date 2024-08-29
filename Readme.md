@@ -1,5 +1,8 @@
 # Common Crawl Pipeline
 
+This is a project to teach Rust to students.
+It is inspired by a real-world LLM pretraining data filtering pipeline build at Aleph Alpha.
+
 ## Setup
 
 ```bash
@@ -83,6 +86,13 @@ For this to work, you need to export this:
 
 ```bash
 export RABBITMQ_CONNECTION_STRING=amqp://localhost:PORT
+```
+
+## Start metrics server
+
+```bash
+brew install autometrics-dev/tap/am
+am start http://localhost:9000 http://localhost:9001
 ```
 
 ## Requirements for students
