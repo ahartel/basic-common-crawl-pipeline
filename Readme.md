@@ -5,17 +5,6 @@ It is inspired by a real-world LLM pretraining data filtering pipeline build at 
 
 ## Setup
 
-```bash
-mkdir common-crawl-pipeline
-cd common-crawl-pipeline
-git init
-cargo new pipeline
-cd pipeline
-mkdir src/bin
-cp src/main.rs src/bin/batcher.rs
-cp src/main.rs src/bin/worker.rs
-```
-
 Install rust dependencies:
 ```
 cargo add flate2
