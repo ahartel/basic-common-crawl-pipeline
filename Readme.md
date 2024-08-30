@@ -1,27 +1,22 @@
 # Common Crawl Pipeline
 
 This is a project to teach Rust to students.
-It is inspired by a real-world LLM pretraining data filtering pipeline build at Aleph Alpha.
+It is inspired by a real-world LLM pre-training data filtering pipeline build at Aleph Alpha.
+
+The pipeline currently consists of a batcher and a worker binary.
+
+The batcher downloads index entries for a hard-coded crawl.
+This is the crawl CC-MAIN-2024-30.
+The batcher will filter out non-English entries and non-successful HTTP requests (non-200).
+It will then produce URL batches of up to 200 entries and publish them into a RabbitMQ queue.
+
+The worker pulls batches from that RabbitMQ queue and downloads each WARC part in turn.
+Then, it extracts the text from the HTML file using the trafilatura Python package.
+It does currently not refine the extracted text in any way nor output the extracted text to a file.
 
 ## Setup
 
-Install rust dependencies:
-```
-cargo add flate2
-cargo add reqwest
-cargo add tokio --features macros,rt-multi-thread
-cargo add clap --features derive
-cargo add autometrics --features prometheus-exporter
-cargo add axum
-cargo add tracing
-cargo add tracing-subscriber --features env-filter
-cargo add serde-aux
-cargo add warc
-cargo add pyo3 --features auto-initialize
-cargo add once_cell
-```
-
-Install Python dependencies:
+### Install Python dependencies:
 ```
 python -m venv venv
 source venv/bin/activate
@@ -29,41 +24,7 @@ pip install trafilatura
 export PYTHONPATH=venv/lib/python3.*/site-packages
 ```
 
-Run the batcher:
-```bash
-cargo run --bin batcher -- --cluster-idx-filename <CLUSTER_IDX_FILENAME>
-```
-
-Run the worker:
-```bash
-cargo run --bin worker
-```
-
-## Steps
-
-First, we download the Common Crawl index file for one crawl:
-```bash
-wget https://data.commoncrawl.org/cc-index/collections/CC-MAIN-2024-30/indexes/cluster.idx
-```
-
-This file contains the alphabetical URL ranges of all the WARC files in the crawl.
-This is not strictly necessary for our case.
-But it helps with downloading smaller file chunks so that we can actually see some progress.
-
-This is how this file looks:
-```
-0,100,22,165)/ 20240722120756   cdx-00000.gz    0       188224  1
-101,141,199,66)/robots.txt 20240714155331       cdx-00000.gz    188224  178351  2
-104,223,1,100)/ 20240714230020  cdx-00000.gz    366575  178055  3
-107,128,254,23)/sites.asp?domain=hydrogenheaters.com 20240725183414     cdx-00000.gz    544630  181599  4
-109,77,250,142)/url?q=https://batmanapollo.ru 20240722133024    cdx-00000.gz    726229  181656  5
-```
-
-The first thing our code needs to do is to download the actual cdx file chunks from the crawl.
-
-Use the `reqwest` crate to download the file, the `flate2` crate to unzip and `tokio` as async runtime.
-
-## Prepare rabbitMQ server
+### Prepare rabbitMQ server
 
 Start the server like this:
 
@@ -86,12 +47,45 @@ For this to work, you need to export this:
 export RABBITMQ_CONNECTION_STRING=amqp://localhost:PORT
 ```
 
-## Start metrics server
+### Install and start metrics server
 
 ```bash
 brew install autometrics-dev/tap/am
 am start http://localhost:9000 http://localhost:9001
 ```
+
+### Download cluster.idx file and start pipeline
+
+First, we download the Common Crawl index file for one crawl:
+```bash
+wget https://data.commoncrawl.org/cc-index/collections/CC-MAIN-2024-30/indexes/cluster.idx
+```
+
+Run the batcher:
+```bash
+cargo run --bin batcher -- --cluster-idx-filename <CLUSTER_IDX_FILENAME>
+```
+
+Run the worker (the worker can and should be started multiple times):
+```bash
+cargo run --bin worker
+```
+
+## Why do we download the cluster.idx file up front?
+
+This file contains the alphabetical URL ranges of all the WARC files in the crawl.
+This is not strictly necessary for our case, but it helps with downloading smaller
+file chunks so that we can actually see some progress.
+
+This is how this file looks:
+```
+0,100,22,165)/ 20240722120756   cdx-00000.gz    0       188224  1
+101,141,199,66)/robots.txt 20240714155331       cdx-00000.gz    188224  178351  2
+104,223,1,100)/ 20240714230020  cdx-00000.gz    366575  178055  3
+107,128,254,23)/sites.asp?domain=hydrogenheaters.com 20240725183414     cdx-00000.gz    544630  181599  4
+109,77,250,142)/url?q=https://batmanapollo.ru 20240722133024    cdx-00000.gz    726229  181656  5
+```
+
 
 ## Requirements for students
 
