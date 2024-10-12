@@ -30,7 +30,9 @@ use clap::Parser;
 use lapin::{options::BasicPublishOptions, BasicProperties};
 use pipeline::{
     cdx::{download_and_unzip, CdxEntry},
-    rabbitmq::{rabbitmq_channel_with_queue, rabbitmq_connection, BATCH_SIZE, CC_QUEUE_NAME},
+    rabbitmq::{
+        publish_batch, rabbitmq_channel_with_queue, rabbitmq_connection, BATCH_SIZE, CC_QUEUE_NAME,
+    },
     tracing_and_metrics::{run_metrics_server, setup_tracing},
 };
 use std::fs;
@@ -93,19 +95,9 @@ async fn main() {
             }
         })
         .collect::<Vec<_>>();
+
         for batch in english_cdx_entries.as_slice().chunks(BATCH_SIZE) {
-            tracing::info!("Sending a batch of {} entries", batch.len());
-            channel
-                .basic_publish(
-                    "",
-                    CC_QUEUE_NAME,
-                    BasicPublishOptions::default(),
-                    &serde_json::to_vec(&batch).unwrap(),
-                    BasicProperties::default(),
-                )
-                .await
-                .context("rabbitmq basic publish")
-                .unwrap();
+            publish_batch(&channel, CC_QUEUE_NAME, batch).await;
         }
         num_cdx_chunks_processed += 1;
         if let Some(to_process) = args.num_cdx_chunks_to_process {
