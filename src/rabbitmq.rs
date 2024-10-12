@@ -8,7 +8,7 @@ use lapin::{
     BasicProperties, Channel, Connection, ConnectionProperties, Queue,
 };
 
-use crate::cdx::CdxEntry;
+use crate::commoncrawl::CdxEntry;
 
 pub const BATCH_SIZE: usize = 1000;
 pub const CC_QUEUE_NAME: &str = "batches";

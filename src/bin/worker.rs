@@ -8,7 +8,7 @@
 use futures_util::StreamExt;
 use lapin::options::BasicAckOptions;
 use pipeline::{
-    cdx::{download_and_unzip, CdxEntry},
+    commoncrawl::{download_and_unzip, CdxEntry},
     rabbitmq::{
         rabbitmq_channel_with_queue, rabbitmq_connection, rabbitmq_consumer, CC_QUEUE_NAME,
     },

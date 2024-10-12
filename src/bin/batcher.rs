@@ -25,11 +25,9 @@
 //! The URLs in the index files are sorted alpha-numerically.
 //!
 //! Once the batcher has downloaded (parts of) an index file, it will filter out URLs that are not in English or that did not return a 200 HTTP status code, batch them into groups whose size has a constant upper limit and push the messages containing these URls into a RabbitMQ queue.
-use anyhow::Context;
 use clap::Parser;
-use lapin::{options::BasicPublishOptions, BasicProperties};
 use pipeline::{
-    cdx::{download_and_unzip, CdxEntry},
+    commoncrawl::{download_and_unzip, parse_cdx_line, parse_cluster_idx},
     rabbitmq::{
         publish_batch, rabbitmq_channel_with_queue, rabbitmq_connection, BATCH_SIZE, CC_QUEUE_NAME,
     },
@@ -108,46 +106,10 @@ async fn main() {
     }
 }
 
-/// Deserialize an index file fow into a [CdxEntry].
-/// Panics if parsing fails.
-fn parse_cdx_line(line: &str) -> CdxEntry {
-    let mut parts = line.splitn(3, ' ');
-    CdxEntry {
-        surt_url: parts.next().unwrap().to_string(),
-        timestamp: parts.next().unwrap().to_string(),
-        metadata: serde_json::from_str(parts.next().unwrap()).unwrap(),
-    }
-}
-
-/// Represents a line in a cluster.idx file.
-/// We only care about the cdx filename and offset/length pair into that file.
-struct ClusterIdxEntry {
-    _surt_url: String,
-    _timestamp: String,
-    cdx_filename: String,
-    cdx_offset: usize,
-    cdx_length: usize,
-    _cluster_id: String,
-}
-
-/// De-serializes a cluster.idx file line into a [ClusterIdxEntry].
-/// Returns none if there are missing elements in the line.
-/// Panics if parsing fails.
-fn parse_cluster_idx(line: &str) -> Option<ClusterIdxEntry> {
-    let mut idx = line.split_whitespace();
-    Some(ClusterIdxEntry {
-        _surt_url: idx.next()?.to_string(),
-        _timestamp: idx.next()?.to_string(),
-        cdx_filename: idx.next()?.to_string(),
-        cdx_offset: idx.next()?.parse().unwrap(),
-        cdx_length: idx.next()?.parse().unwrap(),
-        _cluster_id: idx.next()?.to_string(),
-    })
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::{parse_cdx_line, parse_cluster_idx};
+    use pipeline::commoncrawl::{parse_cdx_line, parse_cluster_idx};
+
 
     #[test]
     fn can_parse_cdx_file_with_three_lines() {
