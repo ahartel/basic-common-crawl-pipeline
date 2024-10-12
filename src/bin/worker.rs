@@ -1,3 +1,10 @@
+//! The worker(s) pull(s) messages from the RabbitMQ queue and downloads the WARC files that contain the actual content of the URLs.
+//! Once the content has been downloaded, the worker extracts the text from the HTML file using the trafilatura Python package.
+//!
+//! After having downloaded and extracted the text from the HTML file, the worker could apply some filters to the extracted text.
+//! We would also want to tokenize (for LLM training) the text and output it to a file.
+//!
+//! In its current implementation it does not refine or filter the extracted text in any way nor does it output the extracted text to a file.
 use futures_util::StreamExt;
 use lapin::options::BasicAckOptions;
 use pipeline::{
