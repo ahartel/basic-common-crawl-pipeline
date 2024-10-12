@@ -1,18 +1,96 @@
 # Common Crawl Pipeline
 
+## Overview
+
 This is a project to teach Rust to students.
-It is inspired by a real-world LLM pre-training data filtering pipeline build at Aleph Alpha.
+It is inspired by a real-world LLM pre-training data filtering pipeline build at @Aleph-Alpha.
+
+The pipeline downloads archived web pages from the Common Crawl dataset and extracts the text from them and applies some filters. To learn more about the Common Crawl dataset, visit https://commoncrawl.org/get-started.
+Common Crawl is a non-profit organization that crawls the web and freely provides its archives and datasets to the public.
+Common Crawl crawls the web roughly once a month.
+For this project, we chose the Common Crawl dataset CC-MAIN-2024-30.
 
 The pipeline currently consists of a batcher and a worker binary.
 
-The batcher downloads index entries for a hard-coded crawl.
-This is the crawl CC-MAIN-2024-30.
+The batcher downloads index entries for the crawl CC-MAIN-2024-30.
 The batcher will filter out non-English entries and non-successful HTTP requests (non-200).
 It will then produce URL batches of up to 200 entries and publish them into a RabbitMQ queue.
 
 The worker pulls batches from that RabbitMQ queue and downloads each WARC part in turn.
 Then, it extracts the text from the HTML file using the trafilatura Python package.
-It does currently not refine the extracted text in any way nor output the extracted text to a file.
+In its current implementation it does not refine the extracted text in any way nor does it output the extracted text to a file.
+
+The reason why we chose this particular architecture is that it allows us to scale the workers up and down, while only having to deploy a single batcher. 
+If we wanted to process another crawl as well, we could simply deploy another batcher. But in practice this is not very efficient since crawls might have a large overlap in URLS. For URLs that show up in multiple crawls, we might only want to keep the most recent version and apply some de-duplication. This is not implemented in this pipeline.
+
+For a more video explaining the background and some details of the project, please see my talk: https://www.youtube.com/watch?v=Moy6kWmx-Os
+
+## How does the batcher work?
+
+The batcher only operates on index files that contain metadata about the URLs that are part of the crawl.
+It does not have to download the actual content of the URLs and therefore it does not have to deal with WARC files.
+
+For a given crawl, there are hundreds of index files, each containing roughly a gigabyte of URL metadata.
+Every line in the index file contains the following information. Notice that I have split the line into multiple lines for readability:
+
+```
+0,100,22,165)/
+20240722120756
+{
+    "url": "http://165.22.100.0/",
+    "mime": "text/html",
+    "mime-detected": "text/html",
+    "status": "301",
+    "digest": "DCNYNIFG5SBRCVS5PCUY4YY2UM2WAQ4R",
+    "length": "689",
+    "offset": "3499",
+    "filename": "crawl-data/CC-MAIN-2024-30/segments/1720763517846.73/crawldiagnostics/CC-MAIN-20240722095039-20240722125039-00443.warc.gz",
+    "redirect": "https://157.245.55.71/"
+}
+```
+
+The first lines contains the URL in SURT (Sort-friendly URI Reordering Transform) format, the second lines contains the crawl timestamp, and the remaining lines contain JSON metadata.
+
+The URLs in the index files are sorted alpha-numerically.
+
+Once the batcher has downloaded (parts of) an index file, it will filter out URLs that are not in English or that did not return a 200 HTTP status code, batch them into groups whose size has a constant upper limit and push the messages containing these URls into a RabbitMQ queue.
+
+### How does the worker work?
+
+The worker(s) pull(s) messages from the RabbitMQ queue and downloads the WARC files that contain the actual content of the URLs.
+Once the content has been downloaded, the worker extracts the text from the HTML file using the trafilatura Python package.
+
+After having downloaded and extracted the text from the HTML file, the worker could apply some filters to the extracted text.
+We would also want to tokenize (for LLM training) the text and output it to a file.
+
+In its current implementation it does not refine or filter the extracted text in any way nor does it output the extracted text to a file.
+
+### Why do we download the cluster.idx file up front?
+
+The batcher could just download the index files one by one and filter and batch URLs from there.
+However, for practical reasons, we chose here to download the so-called cluster.idx file up front.
+We took this decision to be able to show some progress to the user.
+
+The cluster.idx file contains alpha-numerically sorted URL ranges of all the WARC files in the crawl.
+Relying on this file allows us to download parts of the index files and avoids having to download hundreds of megabytes at once.
+It would also enable us to download the index files in parallel, but we have not implemented this yet.
+
+This is how this file looks:
+
+```
+0,100,22,165)/ 20240722120756   cdx-00000.gz    0       188224  1
+101,141,199,66)/robots.txt 20240714155331       cdx-00000.gz    188224  178351  2
+104,223,1,100)/ 20240714230020  cdx-00000.gz    366575  178055  3
+107,128,254,23)/sites.asp?domain=hydrogenheaters.com 20240725183414     cdx-00000.gz    544630  181599  4
+109,77,250,142)/url?q=https://batmanapollo.ru 20240722133024    cdx-00000.gz    726229  181656  5
+```
+
+Every row contains the begin of the URL range, a timestamp, the name of the index file, the offset in the index file, the length of the byte range in the index file and an incrementing index into the cluster.idx file itself.
+
+## Prerequisites
+
+- You need to have Docker installed on your machine so that you can run containers
+- You need to have Rust and Python installed on your machine
 
 ## Setup
 
@@ -81,24 +159,12 @@ export RABBITMQ_CONNECTION_STRING=amqp://localhost:<PORT>
 cargo run --bin worker
 ```
 
-## Why do we download the cluster.idx file up front?
+## Coding challenges
 
-This file contains the alphabetical URL ranges of all the WARC files in the crawl.
-This is not strictly necessary for our case, but it helps with downloading smaller
-file chunks so that we can actually see some progress.
+TODO
 
-This is how this file looks:
 
-```
-0,100,22,165)/ 20240722120756   cdx-00000.gz    0       188224  1
-101,141,199,66)/robots.txt 20240714155331       cdx-00000.gz    188224  178351  2
-104,223,1,100)/ 20240714230020  cdx-00000.gz    366575  178055  3
-107,128,254,23)/sites.asp?domain=hydrogenheaters.com 20240725183414     cdx-00000.gz    544630  181599  4
-109,77,250,142)/url?q=https://batmanapollo.ru 20240722133024    cdx-00000.gz    726229  181656  5
-```
+## Learning resources if you are new to Rust
 
-## Requirements for students
-
-- Docker installed on their machine so that they can run containers
 - Rust book can be looked into beforehand: https://doc.rust-lang.org/book/
 - 100 exercises to learn Rust: https://github.com/mainmatter/100-exercises-to-learn-rust/tree/main
