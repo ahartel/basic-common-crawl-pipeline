@@ -3,7 +3,7 @@
 ## Overview
 
 This is a project to teach Rust to students.
-It is inspired by a real-world LLM pre-training data filtering pipeline build at @Aleph-Alpha.
+It is inspired by a real-world LLM pre-training data filtering pipeline build at [@Aleph-Alpha](https://github.com/Aleph-Alpha/).
 
 The pipeline downloads archived web pages from the Common Crawl dataset and extracts the text from them and applies some filters. To learn more about the Common Crawl dataset, visit https://commoncrawl.org/get-started.
 Common Crawl is a non-profit organization that crawls the web and freely provides its archives and datasets to the public.
@@ -24,6 +24,9 @@ The reason why we chose this particular architecture is that it allows us to sca
 If we wanted to process another crawl as well, we could simply deploy another batcher. But in practice this is not very efficient since crawls might have a large overlap in URLS. For URLs that show up in multiple crawls, we might only want to keep the most recent version and apply some de-duplication. This is not implemented in this pipeline.
 
 For a more video explaining the background and some details of the project, please see my talk: https://www.youtube.com/watch?v=Moy6kWmx-Os
+
+You might realize that the code in this repository does not contain much structure and error handling.
+We have deliberately chosen to leave some open ends because we do occasionally also use this project for coding challenges.
 
 ## How does the batcher work?
 
