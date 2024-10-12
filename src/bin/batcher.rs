@@ -1,3 +1,30 @@
+//! The batcher only operates on index files that contain metadata about the URLs that are part of the crawl.
+//! It does not have to download the actual content of the URLs and therefore it does not have to deal with WARC files.
+//!
+//! For a given crawl, there are hundreds of index files, each containing roughly a gigabyte of URL metadata.
+//! Every line in the index file contains the following information. Notice that I have split the line into multiple lines for readability:
+//!
+//! ```json
+//! 0,100,22,165)/
+//! 20240722120756
+//! {
+//!     "url": "http://165.22.100.0/",
+//!     "mime": "text/html",
+//!     "mime-detected": "text/html",
+//!     "status": "301",
+//!     "digest": "DCNYNIFG5SBRCVS5PCUY4YY2UM2WAQ4R",
+//!     "length": "689",
+//!     "offset": "3499",
+//!     "filename": "crawl-data/CC-MAIN-2024-30/segments/1720763517846.73/crawldiagnostics/CC-MAIN-20240722095039-20240722125039-00443.warc.gz",
+//!     "redirect": "https://157.245.55.71/"
+//! }
+//! ```
+//!
+//! The first lines contains the URL in SURT (Sort-friendly URI Reordering Transform) format, the second lines contains the crawl timestamp, and the remaining lines contain JSON metadata.
+//!
+//! The URLs in the index files are sorted alpha-numerically.
+//!
+//! Once the batcher has downloaded (parts of) an index file, it will filter out URLs that are not in English or that did not return a 200 HTTP status code, batch them into groups whose size has a constant upper limit and push the messages containing these URls into a RabbitMQ queue.
 use anyhow::Context;
 use clap::Parser;
 use lapin::{options::BasicPublishOptions, BasicProperties};
@@ -11,9 +38,14 @@ use std::fs;
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
+    /// For an explanation for why this file needs to be provided, please
+    /// see Readme.md, section "Why do we download the cluster.idx file up front?".
     #[arg(short, long, default_value = "cluster.idx")]
     cluster_idx_filename: String,
 
+    /// This command line argument can be used to limit the number of chunks that should be processed.
+    /// If set, the batcher only processes so many lines from the provided cluster.idx file.
+    /// Otherwise, it processes all entries in the file.
     #[arg(short, long)]
     num_cdx_chunks_to_process: Option<usize>,
 }
@@ -84,6 +116,8 @@ async fn main() {
     }
 }
 
+/// Deserialize an index file fow into a [CdxEntry].
+/// Panics if parsing fails.
 fn parse_cdx_line(line: &str) -> CdxEntry {
     let mut parts = line.splitn(3, ' ');
     CdxEntry {
@@ -93,6 +127,8 @@ fn parse_cdx_line(line: &str) -> CdxEntry {
     }
 }
 
+/// Represents a line in a cluster.idx file.
+/// We only care about the cdx filename and offset/length pair into that file.
 struct ClusterIdxEntry {
     _surt_url: String,
     _timestamp: String,
@@ -102,6 +138,9 @@ struct ClusterIdxEntry {
     _cluster_id: String,
 }
 
+/// De-serializes a cluster.idx file line into a [ClusterIdxEntry].
+/// Returns none if there are missing elements in the line.
+/// Panics if parsing fails.
 fn parse_cluster_idx(line: &str) -> Option<ClusterIdxEntry> {
     let mut idx = line.split_whitespace();
     Some(ClusterIdxEntry {
@@ -119,7 +158,7 @@ mod tests {
     use crate::{parse_cdx_line, parse_cluster_idx};
 
     #[test]
-    fn can_parse_cdx_file() {
+    fn can_parse_cdx_file_with_three_lines() {
         let content = r#"0,100,22,165)/ 20240722120756 {"url": "http://165.22.100.0/", "mime": "text/html", "mime-detected": "text/html", "status": "301", "digest": "DCNYNIFG5SBRCVS5PCUY4YY2UM2WAQ4R", "length": "689", "offset": "3499", "filename": "crawl-data/CC-MAIN-2024-30/segments/1720763517846.73/crawldiagnostics/CC-MAIN-20240722095039-20240722125039-00443.warc.gz", "redirect": "https://157.245.55.71/"}
 0,100,22,165)/robots.txt 20240722120755 {"url": "http://165.22.100.0/robots.txt", "mime": "text/html", "mime-detected": "text/html", "status": "301", "digest": "LYEE2BXON4MCQCP5FDVDNILOWBKCZZ6G", "length": "700", "offset": "4656", "filename": "crawl-data/CC-MAIN-2024-30/segments/1720763517846.73/robotstxt/CC-MAIN-20240722095039-20240722125039-00410.warc.gz", "redirect": "https://157.245.55.71/robots.txt"}
 0,100,59,139)/ 20240723213521 {"url": "https://139.59.100.0/", "mime": "text/html", "mime-detected": "text/html", "status": "200", "digest": "5JOQMMSNM6N7UCLGGYXDSPSB3FYAQS2C", "length": "16650", "offset": "64016172", "filename": "crawl-data/CC-MAIN-2024-30/segments/1720763518115.82/warc/CC-MAIN-20240723194208-20240723224208-00279.warc.gz", "charset": "UTF-8", "languages": "ind,eng"}"#;
@@ -128,7 +167,7 @@ mod tests {
     }
 
     #[test]
-    fn can_parse_cluster_idx_file() {
+    fn can_parse_cluster_idx_file_with_four_lines() {
         let content = r#"0,100,22,165)/ 20240722120756   cdx-00000.gz    0       188224  1
 101,141,199,66)/robots.txt 20240714155331       cdx-00000.gz    188224  178351  2
 104,223,1,100)/ 20240714230020  cdx-00000.gz    366575  178055  3
