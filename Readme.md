@@ -186,3 +186,17 @@ This section summarizes some coding challenges that you might want to try to imp
 
 - Rust book can be looked into beforehand: https://doc.rust-lang.org/book/
 - 100 exercises to learn Rust: https://github.com/mainmatter/100-exercises-to-learn-rust/tree/main
+
+
+## Troubleshooting
+
+Using the MacOS system python3 (/usr/bin/python3, as opposed to python installed via homebrew, pyenv, nix, etc.) may result in runtime errors such as `Library not loaded: @rpath/Python3.framework/Versions/3.8/Python3`. These can be resolved with another addition to .cargo/config.toml:
+
+```
+[build]
+rustflags = [
+  "-C", "link-args=-Wl,-rpath,/Library/Developer/CommandLineTools/Library/Frameworks",
+]
+```
+
+See https://pyo3.rs/v0.21.0/building-and-distribution.html?highlight=rpath#macos for more details.
