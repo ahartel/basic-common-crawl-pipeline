@@ -191,7 +191,7 @@ This section summarizes some coding challenges that you might want to try to imp
     - Can performance be improved by leveraging the tokio async runtime, maybe even using multiple threads if necessary?
     - Add a filter that makes sure that documents are at least 500 characters long and at most 1,000,000 characters long
 - Batcher:
-    - Can we get rid of the `collect` in the batcher that collects the filtered `CdxEntry`s?
+    - (Rust only) Can we get rid of the `collect` in the batcher that collects the filtered `CdxEntry`s?
     - Put in some error handling when publishing a batch to RabbitMQ. Can we recover from network issues or timeouts?
     - Add some monitoring for the batcher so that we know which percentage of the cluster.idx file has already been processed and so that we know how many batches have already been pushed
     - Allow support for providing multiple crawls that can be processed by the batcher. This feature allows us to collect more data than would be available from a single crawl. But notice that this feature is only useful if we can make sure that we only download the content of every URL only once. Notice that a URL might show up in multiple crawls over time.
