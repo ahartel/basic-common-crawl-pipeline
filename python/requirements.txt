@@ -1,0 +1,4 @@
+trafilatura
+pika
+prometheus-client
+requests
