@@ -95,7 +95,7 @@ Every row contains the begin of the URL range, a timestamp, the name of the inde
 - You need to have Docker installed on your machine so that you can run containers
 - You need to have Rust and Python installed on your machine
 
-## Setup
+## Setup for Rust and Python
 
 ### Install Python dependencies:
 
@@ -147,19 +147,34 @@ First, we download the Common Crawl index file for one crawl:
 wget https://data.commoncrawl.org/cc-index/collections/CC-MAIN-2024-30/indexes/cluster.idx
 ```
 
+## Run the Rust-based pipeline
+
 Run the batcher:
 
 ```bash
-export RABBITMQ_CONNECTION_STRING=amqp://localhost:<PORT>
 cargo run --bin batcher -- --cluster-idx-filename <CLUSTER_IDX_FILENAME>
 ```
 
 Run the worker (the worker can and should be started multiple times):
 
 ```bash
-source venv/bin/activate
-export RABBITMQ_CONNECTION_STRING=amqp://localhost:<PORT>
 cargo run --bin worker
+```
+
+## Run the Python-based pipeline
+
+Run the batcher:
+
+```bash
+cd python
+python batcher.py --cluster-idx-filename <CLUSTER_IDX_FILENAME>
+```
+
+Run the worker:
+
+```bash
+cd python
+python worker.py
 ```
 
 ## Coding challenges

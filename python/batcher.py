@@ -18,7 +18,7 @@ batch_counter = Counter("batcher_batches", "Number of published batches")
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Batcher")
     parser.add_argument(
-        "--cluster-index-filename", type=str, help="Input file path", required=True
+        "--cluster-idx-filename", type=str, help="Input file path", required=True
     )
     return parser.parse_args()
 
