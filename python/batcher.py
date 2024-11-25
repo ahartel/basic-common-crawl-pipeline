@@ -1,15 +1,13 @@
 import json
-import os
 import csv
-import pika
-import gzip
 import argparse
-import requests
+
+from commoncrawl import download_and_unzip
+from rabbitmq import QUEUE_NAME, rabbitmq_channel
 
 
 BASE_URL = "https://data.commoncrawl.org/cc-index/collections/CC-MAIN-2024-30/indexes"
-BATCH_SIZE = 1000
-QUEUE_NAME = "batches"
+BATCH_SIZE = 50
 
 
 def parse_args() -> argparse.Namespace:
@@ -20,28 +18,16 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def download_and_unzip(url: str, start: int, length: int) -> str:
-    headers = {"Range": f"bytes={start}-{start+length-1}"}
-    response = requests.get(url, headers=headers)
-    response.raise_for_status()
-    buffer = response.content
-    return gzip.decompress(buffer).decode("utf-8")
-
-
 def main() -> None:
     args = parse_args()
-    connection = pika.BlockingConnection(
-        pika.URLParameters(os.environ["RABBITMQ_CONNECTION_STRING"])
-    )
-    channel = connection.channel()
-    channel.queue_declare(queue=QUEUE_NAME)
+    channel = rabbitmq_channel()
 
     with open(args.cluster_index_filename, "r") as csvfile:
         index_reader = csv.reader(csvfile, delimiter="\t")
         for cdx_chunk in index_reader:
             data = download_and_unzip(
                 f"{BASE_URL}/{cdx_chunk[1]}", int(cdx_chunk[2]), int(cdx_chunk[3])
-            )
+            ).decode("utf-8")
             found_urls = []
             for line in data.split("\n"):
                 if line == "":
