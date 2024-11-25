@@ -1,0 +1,38 @@
+services:
+  rabbitmq:
+    image: "rabbitmq:management"
+    ports:
+      - "15672:15672"
+    expose:
+      - "5672:5672"
+    attach: false
+  autometrics:
+    build:
+      context: .
+      dockerfile: Dockerfile.autometrics
+      args:
+        - METRICS_ENDPOINT_1=http://batcher:9000
+        - METRICS_ENDPOINT_2=http://worker:9001
+    ports:
+      - "6789:6789"
+    expose:
+      - "9000:9000"
+      - "9001:9001"
+  batcher:
+    build:
+      context: .
+      dockerfile: Dockerfile.batcher
+    environment:
+      RABBITMQ_CONNECTION_STRING: amqp://rabbitmq:5672
+    depends_on:
+      - rabbitmq
+      - autometrics
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    environment:
+      RABBITMQ_CONNECTION_STRING: amqp://rabbitmq:5672
+    depends_on:
+      - rabbitmq
+      - autometrics

@@ -1,5 +1,6 @@
 //! This module contains helper methods to set up tracing and a metrics endpoint for Prometheus.
 use autometrics::prometheus_exporter::{self, PrometheusResponse};
+use tracing::level_filters::LevelFilter;
 use tracing_subscriber::EnvFilter;
 
 /// Starts a metrics server listening on `port` using the `axum` crate
@@ -22,7 +23,9 @@ pub async fn run_metrics_server(port: u16) {
 /// Default level is `info` but can be configured via the `RUST_LOG` environment variable.
 /// Registers that subscriber to process traces emitted after this point.
 pub fn setup_tracing() {
-    let filter = EnvFilter::from_default_env();
+    let filter = EnvFilter::builder()
+        .with_default_directive(LevelFilter::INFO.into())
+        .from_env_lossy();
     let subscriber = tracing_subscriber::fmt().with_env_filter(filter).finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
     tracing::info!("Tracing initialized");

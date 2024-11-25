@@ -1,0 +1,37 @@
+# Use a Rust base image with Cargo installed
+FROM rust:bullseye AS builder
+ARG CLUSTER_IDX_FILENAME="cluster.idx"
+ARG DATASET="CC-MAIN-2024-30"
+ARG NUM_CHUNKS_TO_PROCESS=1000
+
+# Install python3
+RUN apt-get update
+RUN apt-get install -y python3 python3-pip
+RUN export PATH=$PATH:/usr/local/bin/python
+RUN pip3 install trafilatura
+RUN export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
+
+# Set the working directory inside the container
+WORKDIR /usr/src/app
+
+# Copy the Cargo.toml and Cargo.lock files
+COPY Cargo.toml Cargo.lock ./
+
+# Create an empty src directory to trick Cargo into thinking it's a valid Rust project
+RUN mkdir src && echo "fn main() {}" > src/main.rs
+
+# Build the dependencies without the actual source code to cache dependencies separately
+RUN cargo build --release
+
+# Now copy the source code
+COPY ./src ./src
+
+# Build your application
+RUN cargo build --release
+
+ENV CLUSTER_IDX_FILENAME=${CLUSTER_IDX_FILENAME}
+ENV DATASET=${DATASET}
+ENV NUM_CHUNKS_TO_PROCESS=${NUM_CHUNKS_TO_PROCESS}
+
+# Command to run the application
+CMD /usr/src/app/target/release/batcher -i ${CLUSTER_IDX_FILENAME} -d ${DATASET} -c ${NUM_CHUNKS_TO_PROCESS}

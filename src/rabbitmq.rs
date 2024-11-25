@@ -1,7 +1,7 @@
 //! This module contains helper functions to interact with the RabbitMQ service.
 use std::time::Duration;
 
-use anyhow::Context;
+use anyhow::{Context, Result};
 use lapin::{
     options::{BasicConsumeOptions, BasicPublishOptions, BasicQosOptions, QueueDeclareOptions},
     types::FieldTable,
@@ -22,7 +22,7 @@ pub fn get_rabbitmq_connection_string() -> String {
 /// Creates a RabbitMQ connection with default [ConnectionProperties].
 /// Can return timeout errors if the operation times out.
 #[tracing::instrument]
-pub async fn rabbitmq_connection() -> Result<Connection, anyhow::Error> {
+pub async fn rabbitmq_connection() -> Result<Connection> {
     let connection_string = get_rabbitmq_connection_string();
     let connection = tokio::time::timeout(
         RABBIT_MQ_TIMEOUT,
@@ -116,6 +116,6 @@ pub async fn publish_batch(channel: &Channel, queue_name: &str, batch: &[CdxEntr
             BasicProperties::default(),
         )
         .await
-        .context("rabbitmq basic publish")
+        .context("rabbitmq basic publish failed")
         .unwrap();
 }

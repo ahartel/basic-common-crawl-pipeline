@@ -33,11 +33,10 @@ pub async fn download_and_unzip(
         .get(url)
         .header("Range", format!("bytes={}-{}", offset, offset + length - 1))
         .send()
-        .await
-        .unwrap();
+        .await?;
     match res.status() {
         reqwest::StatusCode::PARTIAL_CONTENT => {
-            let body = res.bytes().await.unwrap();
+            let body = res.bytes().await?;
             tracing::info!(
                 "Successfully fetched the URL {} from {} to {}",
                 url,
@@ -46,7 +45,7 @@ pub async fn download_and_unzip(
             );
             let mut decoder = flate2::read::GzDecoder::new(&body[..]);
             let mut buffer = Vec::new();
-            decoder.read_to_end(&mut buffer).unwrap();
+            decoder.read_to_end(&mut buffer)?;
             Ok(buffer)
         }
         _ => Err(anyhow::anyhow!(

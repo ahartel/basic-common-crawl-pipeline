@@ -1,23 +1,12 @@
 //! This module contains the Python and PyO3 code to be able to use trafilatura
 //! from Rust.
+
 use once_cell::sync::Lazy;
+use pyo3::ffi::c_str;
 use pyo3::{
     types::{PyAnyMethods, PyModule},
     Py, PyAny, PyObject, Python,
 };
-
-static PYTHON_SCRIPT: &str = r"
-from typing import Optional
-from trafilatura import extract
-
-def extract_text(content: str) -> Optional[str]:
-    text = extract(content, include_comments=False,
-                   include_tables=False, deduplicate=True)
-    # also return None if utf-8 decoding failed
-    if text is None or isinstance(text, bytes):
-        return None
-    return text
-";
 
 static PYTHON_EXTRACT_FUNCTION: Lazy<Py<PyAny>> = Lazy::new(|| {
     Python::with_gil(move |py| -> PyObject {
@@ -25,8 +14,16 @@ static PYTHON_EXTRACT_FUNCTION: Lazy<Py<PyAny>> = Lazy::new(|| {
             "Loading Python trafilatura with version {:?}.",
             py.version_info()
         );
-        let module = PyModule::from_code_bound(py, PYTHON_SCRIPT, "extraction.py", "extraction")
-            .expect("Failed to load Python module");
+
+        let code = c_str!(include_str!("extract_text.py"));
+        
+        let module = PyModule::from_code(
+            py,
+            code,
+            c_str!("extraction.py"),
+            c_str!("extraction"),
+        )
+        .expect("Failed to load Python module");
         let extract_function = module
             .getattr("extract_text")
             .expect("Failed to get extract_text function");

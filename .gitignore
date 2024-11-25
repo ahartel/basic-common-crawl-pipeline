@@ -3,3 +3,4 @@ target
 .autometrics
 venv
 cluster.idx
+.idea

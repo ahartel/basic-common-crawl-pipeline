@@ -1,0 +1,21 @@
+# Use a Debian image
+FROM debian:bullseye
+ARG METRICS_ENDPOINT_1
+ARG METRICS_ENDPOINT_1
+
+# Set the working directory inside the container
+WORKDIR /usr/src/app
+
+# Install
+RUN apt-get update
+RUN apt-get install -y curl
+RUN curl -L https://github.com/autometrics-dev/am/releases/latest/download/am-linux-aarch64 -o am
+
+# make it executable with chmod
+RUN chmod u+x ./am
+
+ENV METRICS_ENDPOINT_1=${METRICS_ENDPOINT_1}
+ENV METRICS_ENDPOINT_2=${METRICS_ENDPOINT_2}
+
+# Command to run the application
+CMD ./am start ${METRICS_ENDPOINT_1} ${METRICS_ENDPOINT_2}
