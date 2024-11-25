@@ -1,6 +1,9 @@
 import json
 import csv
 import argparse
+from typing import Any, Mapping, Sequence
+import pika
+from prometheus_client import Counter, start_http_server
 
 from commoncrawl import download_and_unzip
 from rabbitmq import QUEUE_NAME, rabbitmq_channel
@@ -8,6 +11,8 @@ from rabbitmq import QUEUE_NAME, rabbitmq_channel
 
 BASE_URL = "https://data.commoncrawl.org/cc-index/collections/CC-MAIN-2024-30/indexes"
 BATCH_SIZE = 50
+
+batch_counter = Counter("batcher_batches", "Number of published batches")
 
 
 def parse_args() -> argparse.Namespace:
@@ -18,9 +23,23 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def publish_batch(
+    channel: pika.adapters.blocking_connection.BlockingChannel,
+    batch: Sequence[Mapping[str, Any]],
+) -> None:
+    print("Pushing batch of size", len(batch))
+    channel.basic_publish(
+        exchange="",
+        routing_key=QUEUE_NAME,
+        body=json.dumps(batch),
+    )
+    batch_counter.inc()
+
+
 def main() -> None:
     args = parse_args()
     channel = rabbitmq_channel()
+    start_http_server(9000)
 
     with open(args.cluster_index_filename, "r") as csvfile:
         index_reader = csv.reader(csvfile, delimiter="\t")
@@ -47,21 +66,11 @@ def main() -> None:
                         }
                     )
                 if len(found_urls) >= BATCH_SIZE:
-                    print("Pushing batch of size", len(found_urls))
-                    channel.basic_publish(
-                        exchange="",
-                        routing_key=QUEUE_NAME,
-                        body=json.dumps(found_urls),
-                    )
+                    publish_batch(channel, found_urls)
                     found_urls = []
 
         if len(found_urls) > 0:
-            print("Pushing batch of size", len(found_urls))
-            channel.basic_publish(
-                exchange="",
-                routing_key=QUEUE_NAME,
-                body=json.dumps(found_urls),
-            )
+            publish_batch(channel, found_urls)
 
 
 if __name__ == "__main__":
