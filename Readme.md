@@ -163,17 +163,22 @@ cargo run --bin worker
 
 ## Run the Python-based pipeline
 
-Run the batcher:
+Install dependencies:
 
 ```bash
 cd python
+pip install -r requirements.txt
+```
+
+Run the batcher:
+
+```
 python batcher.py --cluster-idx-filename <CLUSTER_IDX_FILENAME>
 ```
 
 Run the worker:
 
 ```bash
-cd python
 python worker.py
 ```
 
