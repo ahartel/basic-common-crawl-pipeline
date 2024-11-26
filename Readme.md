@@ -95,7 +95,7 @@ Every row contains the begin of the URL range, a timestamp, the name of the inde
 - You need to have Docker installed on your machine so that you can run containers
 - You need to have Rust and Python installed on your machine
 
-## Setup
+## Setup for Rust and Python
 
 ### Install Python dependencies:
 
@@ -147,19 +147,39 @@ First, we download the Common Crawl index file for one crawl:
 wget https://data.commoncrawl.org/cc-index/collections/CC-MAIN-2024-30/indexes/cluster.idx
 ```
 
+## Run the Rust-based pipeline
+
 Run the batcher:
 
 ```bash
-export RABBITMQ_CONNECTION_STRING=amqp://localhost:<PORT>
 cargo run --bin batcher -- --cluster-idx-filename <CLUSTER_IDX_FILENAME>
 ```
 
 Run the worker (the worker can and should be started multiple times):
 
 ```bash
-source venv/bin/activate
-export RABBITMQ_CONNECTION_STRING=amqp://localhost:<PORT>
 cargo run --bin worker
+```
+
+## Run the Python-based pipeline
+
+Install dependencies:
+
+```bash
+cd python
+pip install -r requirements.txt
+```
+
+Run the batcher:
+
+```
+python batcher.py --cluster-idx-filename <CLUSTER_IDX_FILENAME>
+```
+
+Run the worker:
+
+```bash
+python worker.py
 ```
 
 ## Coding challenges
@@ -176,7 +196,7 @@ This section summarizes some coding challenges that you might want to try to imp
     - Can performance be improved by leveraging the tokio async runtime, maybe even using multiple threads if necessary?
     - Add a filter that makes sure that documents are at least 500 characters long and at most 1,000,000 characters long
 - Batcher:
-    - Can we get rid of the `collect` in the batcher that collects the filtered `CdxEntry`s?
+    - (Rust only) Can we get rid of the `collect` in the batcher that collects the filtered `CdxEntry`s?
     - Put in some error handling when publishing a batch to RabbitMQ. Can we recover from network issues or timeouts?
     - Add some monitoring for the batcher so that we know which percentage of the cluster.idx file has already been processed and so that we know how many batches have already been pushed
     - Allow support for providing multiple crawls that can be processed by the batcher. This feature allows us to collect more data than would be available from a single crawl. But notice that this feature is only useful if we can make sure that we only download the content of every URL only once. Notice that a URL might show up in multiple crawls over time.
