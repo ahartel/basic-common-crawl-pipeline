@@ -48,6 +48,10 @@ struct Args {
     /// Otherwise, it processes all entries in the file.
     #[arg(short, long)]
     num_cdx_chunks_to_process: Option<usize>,
+
+    /// The version of the crawl to process, e.g., "CC-MAIN-2024-30".
+    #[arg(short='v', long, default_value = "CC-MAIN-2024-30")]
+    crawl_version: String,
 }
 
 #[tokio::main]
@@ -73,7 +77,8 @@ async fn main() {
         let english_cdx_entries = String::from_utf8(
             download_and_unzip(
                 &format!(
-                    "https://data.commoncrawl.org/cc-index/collections/CC-MAIN-2024-30/indexes/{}",
+                    "https://data.commoncrawl.org/cc-index/collections/{}/indexes/{}",
+                    args.crawl_version,
                     cdx_chunk.cdx_filename
                 ),
                 cdx_chunk.cdx_offset,

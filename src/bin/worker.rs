@@ -16,9 +16,18 @@ use pipeline::{
     trafilatura,
 };
 use warc::WarcHeader;
+use clap::Parser;
+
+#[derive(Parser, Debug)]
+struct Args {
+    /// The version of the crawl to process, e.g., "CC-MAIN-2024-30".
+    #[arg(short='v', long, default_value = "CC-MAIN-2024-30")]
+    crawl_version: String,
+}
 
 #[tokio::main]
 async fn main() {
+    let args = Args::parse();
     setup_tracing();
     tokio::task::spawn(run_metrics_server(9001));
 
@@ -39,7 +48,11 @@ async fn main() {
                 );
                 for entry in batch.unwrap() {
                     let data = download_and_unzip(
-                        &format!("https://data.commoncrawl.org/{}", entry.metadata.filename),
+                        &format!(
+                            "https://data.commoncrawl.org/{}/{}",
+                            args.crawl_version,
+                            entry.metadata.filename
+                        ),
                         entry.metadata.offset,
                         entry.metadata.length,
                     )
