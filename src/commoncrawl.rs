@@ -4,6 +4,7 @@ use std::io::Read;
 use autometrics::autometrics;
 use serde::{Deserialize, Serialize};
 use serde_aux::prelude::deserialize_number_from_string;
+use tokio::time::{sleep, Duration};
 
 /// Metadata for a crawled URL.
 /// We use this metadata in the batcher to filter URLs before passing them on to the worker(s).
@@ -29,31 +30,63 @@ pub async fn download_and_unzip(
     length: usize,
 ) -> Result<Vec<u8>, anyhow::Error> {
     let client = reqwest::Client::new();
-    let res = client
-        .get(url)
-        .header("Range", format!("bytes={}-{}", offset, offset + length - 1))
-        .send()
-        .await
-        .unwrap();
-    match res.status() {
-        reqwest::StatusCode::PARTIAL_CONTENT => {
-            let body = res.bytes().await.unwrap();
-            tracing::info!(
-                "Successfully fetched the URL {} from {} to {}",
-                url,
-                offset,
-                offset + length - 1
-            );
-            let mut decoder = flate2::read::GzDecoder::new(&body[..]);
-            let mut buffer = Vec::new();
-            decoder.read_to_end(&mut buffer).unwrap();
-            Ok(buffer)
+    let mut attempts = 0;
+    let max_attempts = 5;
+    let retry_delay = Duration::from_secs(5);
+
+    loop {
+        let res = client
+            .get(url)
+            .header("Range", format!("bytes={}-{}", offset, offset + length - 1))
+            .send()
+            .await;
+
+        match res {
+            Ok(res) => match res.status() {
+                reqwest::StatusCode::PARTIAL_CONTENT => {
+                    let body = res.bytes().await?;
+                    tracing::info!(
+                        "Successfully fetched the URL {} from {} to {}",
+                        url,
+                        offset,
+                        offset + length - 1
+                    );
+                    let mut decoder = flate2::read::GzDecoder::new(&body[..]);
+                    let mut buffer = Vec::new();
+                    decoder.read_to_end(&mut buffer)?;
+                    return Ok(buffer);
+                }
+                status => {
+                    tracing::warn!(
+                        "Failed to fetch index file {}: {}. Attempt {}/{}",
+                        url,
+                        status,
+                        attempts + 1,
+                        max_attempts
+                    );
+                }
+            },
+            Err(e) => {
+                tracing::warn!(
+                    "Error sending request to {}: {}. Attempt {}/{}",
+                    url,
+                    e,
+                    attempts + 1,
+                    max_attempts
+                );
+            }
         }
-        _ => Err(anyhow::anyhow!(
-            "Failed to fetch index file {}: {}",
-            url,
-            res.status()
-        )),
+
+        attempts += 1;
+        if attempts >= max_attempts {
+            return Err(anyhow::anyhow!(
+                "Failed to fetch index file {} after {} attempts",
+                url,
+                max_attempts
+            ));
+        }
+
+        sleep(retry_delay).await;
     }
 }
 
