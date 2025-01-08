@@ -1,0 +1,14 @@
+scrape_configs:
+  - job_name: "batcher"
+    scrape_interval: 5s
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - "host.docker.internal:9000"
+
+  - job_name: "worker"
+    scrape_interval: 5s
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - "host.docker.internal:9001"

@@ -1,9 +1,18 @@
 //! This module contains helper functions and structs for de-serializing CommonCrawl-specific data structures.
 use std::io::Read;
 
-use autometrics::autometrics;
+use lazy_static::lazy_static;
+use prometheus::{register_int_counter, IntCounter};
 use serde::{Deserialize, Serialize};
 use serde_aux::prelude::deserialize_number_from_string;
+
+lazy_static! {
+    static ref DOWNLOADED_BYTES_COUNTER: IntCounter = register_int_counter!(
+        "downloaded_bytes",
+        "Number of bytes downloaded prior to unzipping"
+    )
+    .unwrap();
+}
 
 /// Metadata for a crawled URL.
 /// We use this metadata in the batcher to filter URLs before passing them on to the worker(s).
@@ -22,7 +31,6 @@ pub struct CdxMetadata {
 
 /// Downloads a given byte range from a URL and unzips the resulting data into a byte Vec.
 /// Does not interpret the output as UTF-8 because the `warc` crate wants plain bytes.
-#[autometrics]
 pub async fn download_and_unzip(
     url: &str,
     offset: usize,
@@ -44,6 +52,7 @@ pub async fn download_and_unzip(
                 offset,
                 offset + length - 1
             );
+            DOWNLOADED_BYTES_COUNTER.inc_by(body.len() as u64);
             let mut decoder = flate2::read::GzDecoder::new(&body[..]);
             let mut buffer = Vec::new();
             decoder.read_to_end(&mut buffer).unwrap();

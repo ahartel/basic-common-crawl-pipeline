@@ -1,21 +1,22 @@
 //! This module contains helper methods to set up tracing and a metrics endpoint for Prometheus.
-use autometrics::prometheus_exporter::{self, PrometheusResponse};
 use tracing_subscriber::EnvFilter;
 
-/// Starts a metrics server listening on `port` using the `axum` crate
-/// so that Prometheus can scrape the `/metrics` endpoint.
+// A small API server that exposes metrics on `/metrics` using `axum`.
 pub async fn run_metrics_server(port: u16) {
-    prometheus_exporter::init();
-
-    async fn metrics() -> PrometheusResponse {
-        prometheus_exporter::encode_http_response()
+    async fn metrics() -> String {
+        let encoder = prometheus::TextEncoder::new();
+        let metrics = prometheus::gather();
+        encoder.encode_to_string(&metrics).unwrap()
     }
 
     let app = axum::Router::new().route("/metrics", axum::routing::get(metrics));
-    let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{port}"))
+    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}"))
         .await
         .unwrap();
-    axum::serve(listener, app).await.unwrap();
+    tracing::info!("Starting metrics server on port {}", port);
+    axum::serve(listener, app.into_make_service())
+        .await
+        .unwrap()
 }
 
 /// Constructs a tracing subscriber that prints formatted traces to stdout.
