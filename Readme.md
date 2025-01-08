@@ -135,8 +135,7 @@ export RABBITMQ_CONNECTION_STRING=amqp://localhost:<PORT>
 ### Install and start metrics server
 
 ```bash
-brew install autometrics-dev/tap/am
-am start http://localhost:9000 http://localhost:9001
+docker run -d --name prometheus -v ./prometheus:/config -p 9090:9090 prom/prometheus --config.file=/config/scrape_configs.yml
 ```
 
 ### Download cluster.idx file and start pipeline
