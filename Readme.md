@@ -151,6 +151,7 @@ wget https://data.commoncrawl.org/cc-index/collections/CC-MAIN-2024-30/indexes/c
 Run the batcher:
 
 ```bash
+cd rust
 cargo run --bin batcher -- --cluster-idx-filename <CLUSTER_IDX_FILENAME>
 ```
 
