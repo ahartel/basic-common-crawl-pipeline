@@ -192,27 +192,20 @@ This is the Go implementation of the Common Crawl pipeline. The implementation f
 - RabbitMQ server running locally (or accessible via network)
 - Common Crawl index file
 
-### Building
-
-To build both the batcher and worker executables:
-
-```bash
-go build -o batcher ./cmd/batcher
-go build -o worker ./cmd/worker
-```
-
 ### Running
+
+> Make sure the current directory is `golang` before running the following commands
 
 1. Start the worker:
 
 ```bash
-./worker
+go run ./cmd/worker
 ```
 
 2. Start the batcher with an index file:
 
 ```bash
-./batcher -cluster-idx-filename <CLUSTER_IDX_FILENAME>
+go run ./cmd/batcher -cluster-idx-filename <CLUSTER_IDX_FILENAME>
 ```
 
 ## Coding challenges
