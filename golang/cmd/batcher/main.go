@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	if err := batcher.Main(); err != nil {
+	if err := batcher.Run(); err != nil {
 		log.Fatalf("Failed to run batcher: %v", err)
 	}
 }

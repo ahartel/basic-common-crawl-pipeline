@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	if err := worker.Main(); err != nil {
+	if err := worker.Run(); err != nil {
 		log.Fatalf("Failed to run worker: %v", err)
 	}
 }

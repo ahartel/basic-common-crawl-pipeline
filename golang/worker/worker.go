@@ -128,7 +128,7 @@ func ProcessBatch(downloader commoncrawl.Downloader, delivery amqp.Delivery) err
 	return nil
 }
 
-func Main() error {
+func Run() error {
 	go func() {
 		http.Handle("/metrics", promhttp.Handler())
 		if err := http.ListenAndServe(":9001", nil); err != nil {

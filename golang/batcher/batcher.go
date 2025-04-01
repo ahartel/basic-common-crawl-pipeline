@@ -158,7 +158,7 @@ func publishBatch(channel rabbitmq.MessageQueueChannel, batch []common.URL) erro
 	return nil
 }
 
-func Main() error {
+func Run() error {
 	clusterIdxFilename := flag.String("cluster-idx-filename", "", "Path to the cluster index file")
 	flag.Parse()
 
