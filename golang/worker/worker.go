@@ -32,12 +32,6 @@ func init() {
 	prometheus.MustRegister(batchCounter)
 }
 
-type URL struct {
-	SurtURL   string                 `json:"surt_url"`
-	Timestamp string                 `json:"timestamp"`
-	Metadata  map[string]interface{} `json:"metadata"`
-}
-
 // extractText extracts text content from HTML using goquery
 func extractText(htmlContent []byte) string {
 	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(htmlContent))
