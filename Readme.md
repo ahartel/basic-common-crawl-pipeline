@@ -5,7 +5,7 @@
 This is a project to teach Rust to students.
 It is inspired by a real-world LLM pre-training data filtering pipeline build at [@Aleph-Alpha](https://github.com/Aleph-Alpha/).
 
-The pipeline downloads archived web pages from the Common Crawl dataset and extracts the text from them and applies some filters. To learn more about the Common Crawl dataset, visit https://commoncrawl.org/get-started.
+The pipeline downloads archived web pages from the Common Crawl dataset and extracts the text from them and applies some filters. To learn more about the Common Crawl dataset, visit <https://commoncrawl.org/get-started>.
 Common Crawl is a non-profit organization that crawls the web and freely provides its archives and datasets to the public.
 Common Crawl crawls the web roughly once a month.
 For this project, we chose the Common Crawl dataset CC-MAIN-2024-30.
@@ -20,10 +20,10 @@ The worker pulls batches from that RabbitMQ queue and downloads each WARC part i
 Then, it extracts the text from the HTML file using the trafilatura Python package.
 In its current implementation it does not refine the extracted text in any way nor does it output the extracted text to a file.
 
-The reason why we chose this particular architecture is that it allows us to scale the workers up and down, while only having to deploy a single batcher. 
+The reason why we chose this particular architecture is that it allows us to scale the workers up and down, while only having to deploy a single batcher.
 If we wanted to process another crawl as well, we could simply deploy another batcher. But in practice this is not very efficient since crawls might have a large overlap in URLS. For URLs that show up in multiple crawls, we might only want to keep the most recent version and apply some de-duplication. This is not implemented in this pipeline.
 
-For a more video explaining the background and some details of the project, please see my talk: https://www.youtube.com/watch?v=Moy6kWmx-Os
+For a more video explaining the background and some details of the project, please see my talk: <https://www.youtube.com/watch?v=Moy6kWmx-Os>
 
 You might realize that the code in this repository does not contain much structure and error handling.
 We have deliberately chosen to leave some open ends because we do occasionally also use this project for coding challenges.
@@ -97,7 +97,7 @@ Every row contains the begin of the URL range, a timestamp, the name of the inde
 
 ## Setup for Rust and Python
 
-### Install Python dependencies:
+### Install Python dependencies
 
 ```
 python -m venv venv
@@ -182,31 +182,55 @@ Run the worker:
 python worker.py
 ```
 
+## Common Crawl Pipeline - Go Implementation
+
+This is the Go implementation of the Common Crawl pipeline. The implementation follows the same structure and functionality as the Python version.
+
+### Prerequisites for go
+
+- Go 1.21 or later
+- RabbitMQ server running locally (or accessible via network)
+- Common Crawl index file
+
+### Running
+
+> Make sure the current directory is `golang` before running the following commands
+
+1. Start the worker:
+
+```bash
+go run ./cmd/worker
+```
+
+2. Start the batcher with an index file:
+
+```bash
+go run ./cmd/batcher -cluster-idx-filename <CLUSTER_IDX_FILENAME>
+```
+
 ## Coding challenges
 
 This section summarizes some coding challenges that you might want to try to implement.
 
 - Batcher and worker:
-    - Add Prometheus counters that track how many documents we are filtering at every stage. This can be done both in the batcher and in the worker.
-- Worker: 
-    - Write the extracted and filtered document content to an object store. It should be possible to pass the address of the object store bucket to the worker. If you don't already have an object store bucket lying around, you can spin up a `minio/minio` container for that and pass the object store address to the worker. Which file format would you use to store the entries on the object store?
-    - Add tokenization so that we already have tokenized data ready for training on the object store. The Huggingface tokenizers library might be a good starting point.
-    - Add some metrics so that we know how much data we are currently downloading and how many batches we have already processed and how many documents we have already processed
-    - (Rust only) Can performance be improved by leveraging the tokio async runtime, maybe even using multiple threads if necessary?
-    - Add a filter that makes sure that documents are at least 500 characters long and at most 1,000,000 characters long
+  - Add Prometheus counters that track how many documents we are filtering at every stage. This can be done both in the batcher and in the worker.
+- Worker:
+  - Write the extracted and filtered document content to an object store. It should be possible to pass the address of the object store bucket to the worker. If you don't already have an object store bucket lying around, you can spin up a `minio/minio` container for that and pass the object store address to the worker. Which file format would you use to store the entries on the object store?
+  - Add tokenization so that we already have tokenized data ready for training on the object store. The Huggingface tokenizers library might be a good starting point.
+  - Add some metrics so that we know how much data we are currently downloading and how many batches we have already processed and how many documents we have already processed
+  - (Rust only) Can performance be improved by leveraging the tokio async runtime, maybe even using multiple threads if necessary?
+  - Add a filter that makes sure that documents are at least 500 characters long and at most 1,000,000 characters long
 - Batcher:
-    - Make it possible to pass the version of the crawl as an argument. Currently, it is hardcoded to CC-MAIN-2024-30.
-    - (Rust only) Can we get rid of the `collect` in the batcher that collects the filtered `CdxEntry`s?
-    - Put in some error handling when publishing a batch to RabbitMQ. Can we recover from network issues or timeouts?
-    - Add some monitoring for the batcher so that we know which percentage of the cluster.idx file has already been processed and so that we know how many batches have already been pushed
-    - Allow support for providing multiple crawls that can be processed by the batcher. This feature allows us to collect more data than would be available from a single crawl. But notice that this feature is only useful if we can make sure that we only download the content of every URL only once. Notice that a URL might show up in multiple crawls over time.
-
+  - Make it possible to pass the version of the crawl as an argument. Currently, it is hardcoded to CC-MAIN-2024-30.
+  - (Rust only) Can we get rid of the `collect` in the batcher that collects the filtered `CdxEntry`s?
+  - Put in some error handling when publishing a batch to RabbitMQ. Can we recover from network issues or timeouts?
+  - Add some monitoring for the batcher so that we know which percentage of the cluster.idx file has already been processed and so that we know how many batches have already been pushed
+  - Allow support for providing multiple crawls that can be processed by the batcher. This feature allows us to collect more data than would be available from a single crawl. But notice that this feature is only useful if we can make sure that we only download the content of every URL only once. Notice that a URL might show up in multiple crawls over time.
 
 ## Learning resources if you are new to Rust
 
-- Rust book can be looked into beforehand: https://doc.rust-lang.org/book/
-- 100 exercises to learn Rust: https://github.com/mainmatter/100-exercises-to-learn-rust/tree/main
-
+- Rust book can be looked into beforehand: <https://doc.rust-lang.org/book/>
+- 100 exercises to learn Rust: <https://github.com/mainmatter/100-exercises-to-learn-rust/tree/main>
 
 ## Troubleshooting
 
@@ -219,4 +243,4 @@ rustflags = [
 ]
 ```
 
-See https://pyo3.rs/v0.21.0/building-and-distribution.html?highlight=rpath#macos for more details.
+See <https://pyo3.rs/v0.21.0/building-and-distribution.html?highlight=rpath#macos> for more details.
