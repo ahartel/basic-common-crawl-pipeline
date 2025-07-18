@@ -26,6 +26,7 @@
 //!
 //! Once the batcher has downloaded (parts of) an index file, it will filter out URLs that are not in English or that did not return a 200 HTTP status code, batch them into groups whose size has a constant upper limit and push the messages containing these URls into a RabbitMQ queue.
 use clap::Parser;
+use lazy_static::lazy_static;
 use pipeline::{
     commoncrawl::{download_and_unzip, parse_cdx_line, parse_cluster_idx},
     rabbitmq::{
@@ -33,7 +34,26 @@ use pipeline::{
     },
     tracing_and_metrics::{run_metrics_server, setup_tracing},
 };
+use prometheus::{register_int_counter, IntCounter};
 use std::fs;
+
+lazy_static! {
+    static ref CLUSTER_IDX_EXCLUDED_ENTRIES_COUNTER: IntCounter = register_int_counter!(
+        "crawler_batcher_cluster_idx_excluded_entries",
+        "Number of entries from the cluster.idx file that do not match the filter criteria."
+    )
+    .unwrap();
+    static ref CLUSTER_IDX_MATCHING_ENTRIES_COUNTER: IntCounter = register_int_counter!(
+        "crawler_batcher_cluster_idx_matching_entries",
+        "Number of entries from the cluster.idx file that match the filter criteria."
+    )
+    .unwrap();
+    static ref CLUSTER_IDX_PROCESSED_CHUNKS: IntCounter = register_int_counter!(
+        "crawler_batcher_cluster_idx_processed_chunks",
+        "Number of chunks from the cluster.idx file that have been processed."
+    )
+    .unwrap();
+}
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -87,8 +107,10 @@ async fn main() {
         .map(parse_cdx_line)
         .filter(|e| {
             if let Some(languages) = e.metadata.languages.as_ref() {
+                CLUSTER_IDX_MATCHING_ENTRIES_COUNTER.inc();
                 languages.contains("eng") && e.metadata.status == 200
             } else {
+                CLUSTER_IDX_EXCLUDED_ENTRIES_COUNTER.inc();
                 false
             }
         })
@@ -98,6 +120,9 @@ async fn main() {
             publish_batch(&channel, CC_QUEUE_NAME, batch).await;
         }
         num_cdx_chunks_processed += 1;
+
+        CLUSTER_IDX_PROCESSED_CHUNKS.inc();
+
         if let Some(to_process) = args.num_cdx_chunks_to_process {
             if to_process == num_cdx_chunks_processed {
                 break;
@@ -109,7 +134,6 @@ async fn main() {
 #[cfg(test)]
 mod tests {
     use pipeline::commoncrawl::{parse_cdx_line, parse_cluster_idx};
-
 
     #[test]
     fn can_parse_cdx_file_with_three_lines() {

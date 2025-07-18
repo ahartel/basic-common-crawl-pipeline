@@ -12,6 +12,11 @@ lazy_static! {
         "Number of bytes downloaded prior to unzipping"
     )
     .unwrap();
+    static ref PARSED_ENTRIES_COUNTER: IntCounter = register_int_counter!(
+        "cluster_idx_parsed_entries",
+        "Number of entries parsed from the cluster index file"
+    )
+    .unwrap();
 }
 
 /// Metadata for a crawled URL.
@@ -41,8 +46,7 @@ pub async fn download_and_unzip(
         .get(url)
         .header("Range", format!("bytes={}-{}", offset, offset + length - 1))
         .send()
-        .await
-        .unwrap();
+        .await?;
     match res.status() {
         reqwest::StatusCode::PARTIAL_CONTENT => {
             let body = res.bytes().await.unwrap();
@@ -101,12 +105,16 @@ pub struct ClusterIdxEntry {
 /// Panics if parsing fails.
 pub fn parse_cluster_idx(line: &str) -> Option<ClusterIdxEntry> {
     let mut idx = line.split_whitespace();
-    Some(ClusterIdxEntry {
+    let entry = ClusterIdxEntry {
         _surt_url: idx.next()?.to_string(),
         _timestamp: idx.next()?.to_string(),
         cdx_filename: idx.next()?.to_string(),
         cdx_offset: idx.next()?.parse().unwrap(),
         cdx_length: idx.next()?.parse().unwrap(),
         _cluster_id: idx.next()?.to_string(),
-    })
+    };
+
+    PARSED_ENTRIES_COUNTER.inc();
+
+    Some(entry)
 }
