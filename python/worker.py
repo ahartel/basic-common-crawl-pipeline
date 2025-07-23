@@ -9,9 +9,11 @@ from commoncrawl import BASE_URL, CCDownloader, Downloader
 from rabbitmq import QUEUE_NAME, rabbitmq_channel
 
 
-batch_counter = Counter("worker_batches", "Number of consumed batches")
-invalid_record_counter = Counter("worker_invalid_records", "Number of invalid records")
-total_records_counter = Counter("worker_total_records", "Total number of records")
+counters = {
+    "batches": Counter("worker_batches", "Number of consumed batches"),
+    "invalid_records": Counter("worker_invalid_records", "Number of invalid records"),
+    "total_records": Counter("worker_total_records", "Total number of records"),
+}
 
 
 def process_batch(downloader: Downloader, ch, method, _properties, body):
@@ -28,9 +30,9 @@ def process_batch(downloader: Downloader, ch, method, _properties, body):
                 _text = trafilatura.extract(record.content_stream().read())
                 # TODO: process text
             else:
-                invalid_record_counter.inc()
-            total_records_counter.inc()
-    batch_counter.inc()
+                counters["invalid_records"].inc()
+            counters["total_records"].inc()
+    counters["batches"].inc()
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
 

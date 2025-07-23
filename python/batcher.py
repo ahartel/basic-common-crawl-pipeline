@@ -17,13 +17,13 @@ from rabbitmq import QUEUE_NAME, MessageQueueChannel, RabbitMQChannel
 
 BATCH_SIZE = 50
 
-batch_counter = Counter("batcher_batches", "Number of published batches")
-
-# Prometheus counters for filtering stages
-total_docs_counter = Counter("batcher_total_documents", "Total documents processed by the batcher")
-non_english_counter = Counter("batcher_non_english_documents", "Documents filtered out for not being English")
-non_200_counter = Counter("batcher_non_200_documents", "Documents filtered out for not having status 200")
-passed_filter_counter = Counter("batcher_passed_filter_documents", "Documents that passed all filters")
+counters = {
+    "batches": Counter("batcher_batches", "Number of published batches"),
+    "total_docs": Counter("batcher_total_documents", "Total documents processed by the batcher"),
+    "non_english": Counter("batcher_non_english_documents", "Documents filtered out for not being English"),
+    "non_200": Counter("batcher_non_200_documents", "Documents filtered out for not having status 200"),
+    "passed_filter": Counter("batcher_passed_filter_documents", "Documents that passed all filters"),
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -44,7 +44,7 @@ def publish_batch(
         routing_key=QUEUE_NAME,
         body=json.dumps(batch),
     )
-    batch_counter.inc()
+    counters["batches"].inc()
 
 
 def process_index(
@@ -64,14 +64,14 @@ def process_index(
             values = line.split(" ")
             metadata = json.loads("".join(values[2:]))
 
-            total_docs_counter.inc()
+            counters["total_docs"].inc()
             if "languages" not in metadata or "eng" not in metadata["languages"]:
-                non_english_counter.inc()
+                counters["non_english"].inc()
                 continue
             if metadata["status"] != "200":
-                non_200_counter.inc()
+                counters["non_200"].inc()
                 continue
-            passed_filter_counter.inc()
+            counters["passed_filter"].inc()
 
             found_urls.append(
                 {
