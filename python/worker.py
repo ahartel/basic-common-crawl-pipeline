@@ -10,6 +10,8 @@ from rabbitmq import QUEUE_NAME, rabbitmq_channel
 
 
 batch_counter = Counter("worker_batches", "Number of consumed batches")
+valid_record_counter = Counter("worker_valid_records", "Number of valid records")
+total_records_counter = Counter("total_records", "Total number of records")
 
 
 def process_batch(downloader: Downloader, ch, method, _properties, body):
@@ -24,7 +26,9 @@ def process_batch(downloader: Downloader, ch, method, _properties, body):
         for record in WARCIterator(io.BytesIO(data)):
             if record.rec_type == "response":
                 _text = trafilatura.extract(record.content_stream().read())
+                valid_record_counter.inc()
                 # TODO: process text
+            total_records_counter.inc()
     batch_counter.inc()
     ch.basic_ack(delivery_tag=method.delivery_tag)
 

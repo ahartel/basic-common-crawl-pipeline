@@ -19,6 +19,12 @@ BATCH_SIZE = 50
 
 batch_counter = Counter("batcher_batches", "Number of published batches")
 
+# Prometheus counters for filtering stages
+total_docs_counter = Counter("batcher_total_documents", "Total documents processed by the batcher")
+non_english_counter = Counter("batcher_non_english_documents", "Documents filtered out for not being English")
+non_200_counter = Counter("batcher_non_200_documents", "Documents filtered out for not having status 200")
+passed_filter_counter = Counter("batcher_passed_filter_documents", "Documents that passed all filters")
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Batcher")
@@ -57,18 +63,23 @@ def process_index(
                 continue
             values = line.split(" ")
             metadata = json.loads("".join(values[2:]))
-            if (
-                "languages" in metadata
-                and "eng" in metadata["languages"]
-                and metadata["status"] == "200"
-            ):
-                found_urls.append(
-                    {
-                        "surt_url": values[0],
-                        "timestamp": values[1],
-                        "metadata": metadata,
-                    }
-                )
+
+            total_docs_counter.inc()
+            if "languages" not in metadata or "eng" not in metadata["languages"]:
+                non_english_counter.inc()
+                continue
+            if metadata["status"] != "200":
+                non_200_counter.inc()
+                continue
+            passed_filter_counter.inc()
+
+            found_urls.append(
+                {
+                    "surt_url": values[0],
+                    "timestamp": values[1],
+                    "metadata": metadata,
+                }
+            )
             if len(found_urls) >= batch_size:
                 publish_batch(channel, found_urls)
                 found_urls = []
