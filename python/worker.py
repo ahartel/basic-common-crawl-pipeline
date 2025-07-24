@@ -35,7 +35,7 @@ def process_batch(downloader: Downloader, ch, method, _properties, body, uploade
         for record in WARCIterator(io.BytesIO(data)):
             if record.rec_type == "response":
                 _text = trafilatura.extract(record.content_stream().read())
-                if _text:
+                if _text and 1000000 > len(_text) > 500:
                     token_ids = tokenizer.encode(_text).ids
                     documents.append({
                         "surt_url": item["surt_url"],
@@ -45,6 +45,8 @@ def process_batch(downloader: Downloader, ch, method, _properties, body, uploade
                         "offset": item["metadata"]["offset"],
                         "length": item["metadata"]["length"],
                     })
+                else:
+                    COUNTERS["invalid_records"].inc()
             else:
                 COUNTERS["invalid_records"].inc()
             COUNTERS["total_records"].inc()
