@@ -17,7 +17,7 @@ from rabbitmq import QUEUE_NAME, MessageQueueChannel, RabbitMQChannel
 
 BATCH_SIZE = 50
 
-counters = {
+COUNTERS = {
     "batches": Counter("batcher_batches", "Number of published batches"),
     "total_docs": Counter("batcher_total_documents", "Total documents processed by the batcher"),
     "non_english": Counter("batcher_non_english_documents", "Documents filtered out for not being English"),
@@ -44,7 +44,19 @@ def publish_batch(
         routing_key=QUEUE_NAME,
         body=json.dumps(batch),
     )
-    counters["batches"].inc()
+    COUNTERS["batches"].inc()
+
+
+def process_document(metadata: Any, counters: Mapping[str, Counter]) -> bool:
+    counters['total_docs'].inc()
+    if not "languages" in metadata and "eng" in metadata["languages"]:
+        counters['non_english'].inc()
+        return False
+    if not metadata.get("status") == "200":
+        counters['non_200'].inc()
+        return False
+    counters['passed_filter'].inc()
+    return True
 
 
 def process_index(
@@ -64,14 +76,8 @@ def process_index(
             values = line.split(" ")
             metadata = json.loads("".join(values[2:]))
 
-            counters["total_docs"].inc()
-            if "languages" not in metadata or "eng" not in metadata["languages"]:
-                counters["non_english"].inc()
+            if not process_document(metadata, COUNTERS):
                 continue
-            if metadata["status"] != "200":
-                counters["non_200"].inc()
-                continue
-            counters["passed_filter"].inc()
 
             found_urls.append(
                 {
