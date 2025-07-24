@@ -6,3 +6,4 @@ requests
 warcio
 minio
 pyarrow
+tokenizers

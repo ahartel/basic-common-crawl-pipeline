@@ -1,12 +1,11 @@
 import io
 import os
 import json
-import pandas as pd
-import pyarrow as pa
-import pyarrow.parquet as pq
+
 from prometheus_client import start_http_server, Counter
 import trafilatura
 from warcio.archiveiterator import WARCIterator
+from tokenizers import Tokenizer
 
 from commoncrawl import BASE_URL, CCDownloader, Downloader
 from rabbitmq import QUEUE_NAME, rabbitmq_channel
@@ -19,6 +18,8 @@ COUNTERS = {
     "invalid_records": Counter("worker_invalid_records", "Number of invalid records"),
     "total_records": Counter("worker_total_records", "Total number of records"),
 }
+
+tokenizer = Tokenizer.from_pretrained("gpt2")
 
 
 def process_batch(downloader: Downloader, ch, method, _properties, body, uploader):
@@ -35,10 +36,11 @@ def process_batch(downloader: Downloader, ch, method, _properties, body, uploade
             if record.rec_type == "response":
                 _text = trafilatura.extract(record.content_stream().read())
                 if _text:
+                    token_ids = tokenizer.encode(_text).ids
                     documents.append({
                         "surt_url": item["surt_url"],
                         "url": item["metadata"]["url"],
-                        "text": _text,
+                        "token_ids": token_ids,
                         "filename": item["metadata"]["filename"],
                         "offset": item["metadata"]["offset"],
                         "length": item["metadata"]["length"],
@@ -47,7 +49,7 @@ def process_batch(downloader: Downloader, ch, method, _properties, body, uploade
                 COUNTERS["invalid_records"].inc()
             COUNTERS["total_records"].inc()
     if documents:
-        object_name = f"batch_{method.delivery_tag}.parquet"
+        object_name = f"batch_{method.delivery_tag}" + uploader.extension
         uploader.upload(object_name, documents)
     COUNTERS["batches"].inc()
     ch.basic_ack(delivery_tag=method.delivery_tag)

@@ -18,6 +18,8 @@ class AbstractUploader(ABC):
 
 
 class ParquetUploader(AbstractUploader):
+    extension = ".parquet"
+
     def upload(self, object_name: str, data: any, content_type: str = "application/octet-stream"):
         df = pd.DataFrame(data)
         buffer = io.BytesIO()
