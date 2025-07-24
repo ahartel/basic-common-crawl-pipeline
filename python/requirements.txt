@@ -1,5 +1,8 @@
 trafilatura
+lxml_html_clean
 pika
 prometheus-client
 requests
 warcio
+minio
+pyarrow
