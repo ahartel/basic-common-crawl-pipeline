@@ -49,10 +49,10 @@ def publish_batch(
 
 def process_document(metadata: Any, counters: Mapping[str, Counter]) -> bool:
     counters['total_docs'].inc()
-    if not "languages" in metadata and "eng" in metadata["languages"]:
+    if "languages" not in metadata or "eng" not in metadata["languages"]:
         counters['non_english'].inc()
         return False
-    if not metadata.get("status") == "200":
+    if metadata.get("status") != "200":
         counters['non_200'].inc()
         return False
     counters['passed_filter'].inc()
