@@ -1,9 +1,8 @@
-from abc import ABC, abstractmethod
 import csv
 import gzip
-from typing import Generator, List, Optional
-import requests
+from abc import ABC, abstractmethod
 
+import requests
 
 CRAWL_PATH = "cc-index/collections/CC-MAIN-2024-30/indexes"
 BASE_URL = "https://data.commoncrawl.org"
@@ -20,7 +19,7 @@ class CCDownloader(Downloader):
         self.base_url = base_url
 
     def download_and_unzip(self, url: str, start: int, length: int) -> bytes:
-        headers = {"Range": f"bytes={start}-{start+length-1}"}
+        headers = {"Range": f"bytes={start}-{start + length - 1}"}
         response = requests.get(f"{self.base_url}/{url}", headers=headers)
         response.raise_for_status()
         buffer = response.content
@@ -35,7 +34,7 @@ class IndexReader(ABC):
 
 class CSVIndexReader(IndexReader):
     def __init__(self, filename: str) -> None:
-        self.file = open(filename, "r")
+        self.file = open(filename)
         self.reader = csv.reader(self.file, delimiter="\t")
 
     def __iter__(self):

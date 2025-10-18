@@ -1,6 +1,6 @@
-from batcher import process_index
-from commoncrawl import Downloader, IndexReader
-from rabbitmq import MessageQueueChannel
+from commoncrawl_pipeline.batcher import process_index
+from commoncrawl_pipeline.commoncrawl import Downloader, IndexReader
+from commoncrawl_pipeline.rabbitmq import MessageQueueChannel
 
 
 class FakeReader(IndexReader):
@@ -16,7 +16,7 @@ class FakeDownloader(Downloader):
         self.row = row
 
     def download_and_unzip(self, url: str, start: int, length: int) -> bytes:
-        return f"{self.row}".encode("utf-8")
+        return f"{self.row}".encode()
 
 
 class ChannelSpy(MessageQueueChannel):
@@ -69,6 +69,7 @@ def test_filter_bad_status_code():
     )
     process_index(reader, channel, downloader, 2)
     assert channel.num_called == 0
+
 
 def test_publish_all_urls():
     reader = FakeReader(

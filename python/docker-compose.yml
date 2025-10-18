@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  # RabbitMQ message queue service
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: commoncrawl-rabbitmq
+    ports:
+      - "5672:5672"   # AMQP protocol port
+      - "15672:15672" # Management UI port
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - commoncrawl-network
+    restart: unless-stopped
+
+  # Prometheus metrics collection service
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: commoncrawl-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ../prometheus/scrape_configs.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - commoncrawl-network
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+# Named volumes for data persistence
+volumes:
+  rabbitmq_data:
+    driver: local
+  prometheus_data:
+    driver: local
+
+# Custom network for service communication
+networks:
+  commoncrawl-network:
+    driver: bridge

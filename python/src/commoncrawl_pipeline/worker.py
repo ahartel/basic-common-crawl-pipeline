@@ -1,13 +1,12 @@
 import io
 import json
-from prometheus_client import start_http_server
+
 import trafilatura
+from prometheus_client import Counter, start_http_server
 from warcio.archiveiterator import WARCIterator
-from prometheus_client import Counter
 
-from commoncrawl import BASE_URL, CCDownloader, Downloader
-from rabbitmq import QUEUE_NAME, rabbitmq_channel
-
+from commoncrawl_pipeline.commoncrawl import BASE_URL, CCDownloader, Downloader
+from commoncrawl_pipeline.rabbitmq import QUEUE_NAME, rabbitmq_channel
 
 batch_counter = Counter("worker_batches", "Number of consumed batches")
 

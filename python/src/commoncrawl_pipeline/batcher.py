@@ -1,10 +1,11 @@
-from abc import ABC, abstractmethod
-import json
 import argparse
-from typing import Any, Mapping, Sequence
+import json
+from collections.abc import Mapping, Sequence
+from typing import Any
+
 from prometheus_client import Counter, start_http_server
 
-from commoncrawl import (
+from commoncrawl_pipeline.commoncrawl import (
     BASE_URL,
     CRAWL_PATH,
     CCDownloader,
@@ -12,8 +13,11 @@ from commoncrawl import (
     Downloader,
     IndexReader,
 )
-from rabbitmq import QUEUE_NAME, MessageQueueChannel, RabbitMQChannel
-
+from commoncrawl_pipeline.rabbitmq import (
+    QUEUE_NAME,
+    MessageQueueChannel,
+    RabbitMQChannel,
+)
 
 BATCH_SIZE = 50
 

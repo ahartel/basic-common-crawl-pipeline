@@ -1,7 +1,7 @@
-from abc import ABC, abstractmethod
 import os
-import pika
+from abc import ABC, abstractmethod
 
+import pika
 
 QUEUE_NAME = "batches"
 
@@ -25,7 +25,6 @@ class RabbitMQChannel(MessageQueueChannel):
 
 
 def rabbitmq_channel() -> pika.adapters.blocking_connection.BlockingChannel:
-
     connection = pika.BlockingConnection(
         pika.URLParameters(os.environ["RABBITMQ_CONNECTION_STRING"])
     )
