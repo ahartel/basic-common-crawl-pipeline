@@ -3,3 +3,5 @@ pika
 prometheus-client
 requests
 warcio
+minio>=7.2.7
+transformers

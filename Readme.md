@@ -138,6 +138,28 @@ export RABBITMQ_CONNECTION_STRING=amqp://localhost:<PORT>
 docker run -d --name prometheus -v ./prometheus:/config -p 9090:9090 prom/prometheus --config.file=/config/scrape_configs.yml
 ```
 
+### Instal and start minio server
+
+```bash
+docker run -d \
+  --name minio \
+  -p 9003:9000 \
+  -p 9004:9001 \
+  -e "MINIO_ROOT_USER=minioadmin" \
+  -e "MINIO_ROOT_PASSWORD=minioadmin123" \
+  -v $(pwd)/data:/data \
+  quay.io/minio/minio server /data --console-address ":9001"  
+```
+
+We fix minio port on 9003, more robust option would be docker-compose for the whole pipeline. MINIO_ROOT_USER & MINIO_ROOT_PASSWORD
+are configurable. For this to work you have to export this
+
+```bash
+export MINIO_CONNECTION_STRING="localhost:9003"
+export MINIO_ACCESS_KEY="minioadmin"
+export MINIO_SECRET_KEY="minioadmin123"
+```
+
 ### Download cluster.idx file and start pipeline
 
 First, we download the Common Crawl index file for one crawl:

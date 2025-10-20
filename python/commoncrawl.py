@@ -27,6 +27,9 @@ class CCDownloader(Downloader):
         return gzip.decompress(buffer)
 
 
+# IndexReader iterator expected to return
+# (url: string, start: int, length: int)
+# length is measured in characters
 class IndexReader(ABC):
     @abstractmethod
     def __iter__(self):

@@ -49,9 +49,8 @@ def process_index(
 ) -> None:
     found_urls = []
     for cdx_chunk in index:
-        data = downloader.download_and_unzip(
-            cdx_chunk[1], int(cdx_chunk[2]), int(cdx_chunk[3])
-        ).decode("utf-8")
+        url, start, length = cdx_chunk[1], int(cdx_chunk[2]), int(cdx_chunk[3])
+        data = downloader.download_and_unzip(url, start, length).decode("utf-8")
         for line in data.split("\n"):
             if line == "":
                 continue
