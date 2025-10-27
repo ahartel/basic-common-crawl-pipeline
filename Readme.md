@@ -163,22 +163,57 @@ cargo run --bin worker
 
 ## Run the Python-based pipeline
 
-Install dependencies:
+The Python implementation supports **three deployment environments**: Local Development, Docker, and Kubernetes.
+
+### Installation
 
 ```bash
 cd python
 pip install -r requirements.txt
 ```
 
-Run the batcher:
+### Quick Start
 
-```
-python batcher.py --cluster-idx-filename <CLUSTER_IDX_FILENAME>
+**Basic usage:**
+```bash
+./deploy.sh local    # Development (app on host, infra in Docker)
+./deploy.sh docker   # Everything in Docker containers  
+./deploy.sh k8       # Kubernetes production deployment
+./deploy.sh k8 stop  # Stop deployment
 ```
 
-Run the worker:
+**Specify version:**
+```bash
+./deploy.sh local --version CC-MAIN-2024-30
+./deploy.sh docker --version CC-MAIN-2024-30
+./deploy.sh k8 --version CC-MAIN-2024-30
+```
+
+**Scale workers:**
+```bash
+./deploy.sh local --worker-count 3
+./deploy.sh docker --worker-count 5
+./deploy.sh k8 --worker-count 10
+```
+
+**Combine options:**
+```bash
+./deploy.sh docker --version CC-MAIN-2024-30 --worker-count 5
+./deploy.sh k8 --version CC-MAIN-2024-30 --worker-count 10
+```
+
+### Manual Running (Alternative)
+
+Run components directly without deployment scripts:
 
 ```bash
+# Set environment variables
+export CLUSTER_IDX_FILENAME=./cluster.idx
+
+# Run batcher
+python batcher.py
+
+# Run workers (can run multiple instances)
 python worker.py
 ```
 
@@ -221,7 +256,7 @@ This section summarizes some coding challenges that you might want to try to imp
   - (Rust only) Can performance be improved by leveraging the tokio async runtime, maybe even using multiple threads if necessary?
   - Add a filter that makes sure that documents are at least 500 characters long and at most 1,000,000 characters long
 - Batcher:
-  - Make it possible to pass the version of the crawl as an argument. Currently, it is hardcoded to CC-MAIN-2024-30.
+  - ~~Make it possible to pass the version of the crawl as an argument. Currently, it is hardcoded to CC-MAIN-2024-30.~~ ✅ **Done**: Pass version using `--version CC-MAIN-2024-30` or set `COMMONCRAWL_VERSION` env var
   - (Rust only) Can we get rid of the `collect` in the batcher that collects the filtered `CdxEntry`s?
   - Put in some error handling when publishing a batch to RabbitMQ. Can we recover from network issues or timeouts?
   - Add some monitoring for the batcher so that we know which percentage of the cluster.idx file has already been processed and so that we know how many batches have already been pushed

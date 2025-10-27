@@ -1,0 +1,110 @@
+version: '3.8'
+
+networks:
+  app_network:
+    driver: bridge
+
+services:
+  rabbitmq:
+    image: rabbitmq:management
+    ports:
+      - "5672:5672"   # AMQP port
+      - "15672:15672" # Management interface
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app_network
+
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9002:9000"   # MinIO API port (mapped to 9002 to avoid conflict with batcher)
+      - "9003:9001"   # MinIO Console port (mapped to 9003)
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app_network
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ../../../prometheus:/config
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/config/scrape_configs.yml'
+      - '--storage.tsdb.path=/prometheus'
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app_network
+
+  batcher:
+    build:
+      context: ../../..
+      dockerfile: python/deployment/docker/Dockerfile.batcher
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      prometheus:
+        condition: service_healthy
+    env_file:
+      - ../.env
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      BATCHER_METRICS_PORT: 9000
+      CLUSTER_IDX_FILENAME: /app/input/cluster.idx
+      # Override connection strings for container communication
+      RABBITMQ_CONNECTION_STRING: "amqp://guest:guest@rabbitmq:5672/"
+      MINIO_ENDPOINT: "http://minio:9000"
+    volumes:
+      - ./input:/app/input
+    command: ["python", "batcher.py"]
+    networks:
+      - app_network
+
+  worker:
+    build:
+      context: ../../..
+      dockerfile: python/deployment/docker/Dockerfile.worker
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      prometheus:
+        condition: service_healthy
+    env_file:
+      - ../.env
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      WORKER_METRICS_PORT: 9001
+      # Override connection strings for container communication
+      RABBITMQ_CONNECTION_STRING: "amqp://guest:guest@rabbitmq:5672/"
+      MINIO_ENDPOINT: "http://minio:9000"
+    restart: unless-stopped
+    networks:
+      - app_network
+
+volumes:
+  minio_data:
+    driver: local
+  prometheus_data:
+    driver: local

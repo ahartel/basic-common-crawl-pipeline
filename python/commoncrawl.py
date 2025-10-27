@@ -1,12 +1,15 @@
 from abc import ABC, abstractmethod
 import csv
 import gzip
+import os
 from typing import Generator, List, Optional
 import requests
 
 
-CRAWL_PATH = "cc-index/collections/CC-MAIN-2024-30/indexes"
-BASE_URL = "https://data.commoncrawl.org"
+COMMONCRAWL_VERSION = os.getenv("COMMONCRAWL_VERSION", "CC-MAIN-2024-30")
+COMMONCRAWL_BASE_URL = os.getenv("COMMONCRAWL_BASE_URL", "https://data.commoncrawl.org")
+CRAWL_PATH = os.getenv("CRAWL_PATH", f"cc-index/collections/{COMMONCRAWL_VERSION}/indexes")
+BASE_URL = COMMONCRAWL_BASE_URL
 
 
 class Downloader(ABC):
@@ -46,6 +49,30 @@ class CSVIndexReader(IndexReader):
 
     def __del__(self) -> None:
         self.file.close()
+
+
+def download_cluster_idx(crawl_version: str, output_path: str) -> None:
+    """
+    Download the cluster.idx file for a given Common Crawl version.
+    
+    Args:
+        crawl_version: The Common Crawl version (e.g., "CC-MAIN-2024-30")
+        output_path: Path where the file should be saved
+    """
+    # Construct the download URL
+    url = f"{COMMONCRAWL_BASE_URL}/cc-index/collections/{crawl_version}/indexes/cluster.idx"
+    
+    # Ensure output directory exists
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    
+    # Download the file
+    response = requests.get(url, stream=True)
+    response.raise_for_status()
+    
+    # Write to file
+    with open(output_path, 'wb') as f:
+        for chunk in response.iter_content(chunk_size=8192):
+            f.write(chunk)
 
 
 def test_can_read_index(tmp_path):

@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: commoncrawl
+spec:
+  replicas: 2  # Adjust number of workers here
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      containers:
+      - name: worker
+        image: worker:latest  # Build and push to registry first
+        imagePullPolicy: Never  # For local testing, use IfNotPresent for registry
+        env:
+        - name: RABBITMQ_CONNECTION_STRING
+          value: "amqp://guest:guest@rabbitmq.commoncrawl.svc.cluster.local:5672/"
+        - name: WORKER_METRICS_PORT
+          value: "9001"
+        - name: MINIO_ENDPOINT
+          value: "http://minio.commoncrawl.svc.cluster.local:9000"
+        - name: MINIO_CONSOLE_ENDPOINT
+          value: "http://minio.commoncrawl.svc.cluster.local:9003"
+        envFrom:
+        - configMapRef:
+            name: commoncrawl-config
+        ports:
+        - containerPort: 9001
+          name: metrics
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+

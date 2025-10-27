@@ -1,0 +1,48 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+  namespace: commoncrawl
+spec:
+  type: LoadBalancer  # For production
+  selector:
+    app: rabbitmq
+  ports:
+  - name: amqp
+    port: 5672
+    targetPort: 5672
+  - name: management
+    port: 15672
+    targetPort: 15672
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  namespace: commoncrawl
+spec:
+  type: LoadBalancer  # For production
+  selector:
+    app: minio
+  ports:
+  - name: api
+    port: 9000
+    targetPort: 9000
+  - name: console
+    port: 9003
+    targetPort: 9001
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: commoncrawl
+spec:
+  type: LoadBalancer  # For production
+  selector:
+    app: prometheus
+  ports:
+  - name: metrics
+    port: 9090
+    targetPort: 9090

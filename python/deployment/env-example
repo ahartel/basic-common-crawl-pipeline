@@ -1,0 +1,25 @@
+# Common Crawl Configuration
+COMMONCRAWL_VERSION=CC-MAIN-2024-30
+COMMONCRAWL_BASE_URL=https://data.commoncrawl.org
+
+# RabbitMQ Configuration
+RABBITMQ_CONNECTION_STRING=amqp://guest:guest@localhost:5672/
+
+# MinIO Configuration
+BUCKET_NAME=extracteddata
+MINIO_ENDPOINT=http://localhost:9002
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=minioadmin
+
+# Batcher Configuration
+BATCHER_BATCH_SIZE=50
+BATCHER_METRICS_PORT=9000
+# For Docker/K8s: Set automatically by docker-compose.yaml or ConfigMap
+# For local: Use --cluster-idx-filename parameter
+
+# Worker Configuration
+WORKER_METRICS_PORT=9001
+MIN_TEXT_LENGTH=500
+MAX_TEXT_LENGTH=1000000
+TOKENIZER_NAME=bert-base-uncased
+

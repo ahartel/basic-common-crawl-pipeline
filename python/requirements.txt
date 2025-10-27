@@ -3,3 +3,7 @@ pika
 prometheus-client
 requests
 warcio
+lxml
+boto3
+transformers
+tokenizers
