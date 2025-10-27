@@ -248,7 +248,17 @@ go run ./cmd/batcher -cluster-idx-filename <CLUSTER_IDX_FILENAME>
 This section summarizes some coding challenges that you might want to try to implement.
 
 - Batcher and worker:
-  - Add Prometheus counters that track how many documents we are filtering at every stage. This can be done both in the batcher and in the worker.
+  - ~~Add Prometheus counters that track how many documents we are filtering at every stage. This can be done both in the batcher and in the worker.~~ ✅ **Done**: 
+    - **Batcher** (port 9000): 
+      - `batcher_total_documents` - All documents processed
+      - `batcher_no_language_info` - Documents without language info
+      - `batcher_non_english` - Non-English documents filtered out
+      - `batcher_english_documents` - English documents found
+      - `batcher_status_200` - HTTP 200 responses
+      - `batcher_non_200_status` - Non-200 responses filtered out
+      - `batcher_urls_sent` - URLs actually sent to queue
+      - `batcher_batches` - Batches published
+    - **Worker** (port 9001): `worker_urls_processed`, `worker_warc_records`, `worker_text_extraction_attempts`, `worker_text_extraction_success`, `worker_batches`
 - Worker:
   - Write the extracted and filtered document content to an object store. It should be possible to pass the address of the object store bucket to the worker. If you don't already have an object store bucket lying around, you can spin up a `minio/minio` container for that and pass the object store address to the worker. Which file format would you use to store the entries on the object store?
   - Add tokenization so that we already have tokenized data ready for training on the object store. The Huggingface tokenizers library might be a good starting point.

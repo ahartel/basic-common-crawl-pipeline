@@ -27,6 +27,19 @@ logger = logging.getLogger(__name__)
 BATCH_SIZE = int(os.getenv("BATCHER_BATCH_SIZE", os.getenv("BATCH_SIZE", "50")))
 
 batch_counter = Counter("batcher_batches", "Number of published batches")
+total_documents_counter = Counter("batcher_total_documents", "Total documents processed")
+
+# Language filtering counters
+no_language_info_counter = Counter("batcher_no_language_info", "Documents without language information")
+non_english_counter = Counter("batcher_non_english", "Non-English documents filtered out")
+english_documents_counter = Counter("batcher_english_documents", "English documents")
+
+# Status filtering counters
+non_200_status_counter = Counter("batcher_non_200_status", "Documents with non-200 status filtered out")
+status_200_counter = Counter("batcher_status_200", "Documents with status 200")
+
+# Combined filters
+urls_in_batches_counter = Counter("batcher_urls_sent", "Total URLs sent in batches")
 
 
 def parse_args() -> argparse.Namespace:
@@ -68,12 +81,28 @@ def process_index(
             if line == "":
                 continue
             values = line.split(" ")
+            total_documents_counter.inc()
             metadata = json.loads("".join(values[2:]))
-            if (
-                "languages" in metadata
-                and "eng" in metadata["languages"]
-                and metadata["status"] == "200"
-            ):
+
+            is_english = False
+            if "languages" in metadata:
+                if "eng" in metadata["languages"]:
+                    is_english = True
+                    english_documents_counter.inc()
+                else:
+                    non_english_counter.inc()
+            else:
+                no_language_info_counter.inc()
+
+            is_status_200 = False
+            if metadata.get("status") == "200":
+                is_status_200 = True
+                status_200_counter.inc()
+            else:
+                non_200_status_counter.inc()
+            
+            # Apply filters: English only AND status 200 only
+            if is_english and is_status_200:
                 found_urls.append(
                     {
                         "surt_url": values[0],
@@ -81,6 +110,8 @@ def process_index(
                         "metadata": metadata,
                     }
                 )
+                urls_in_batches_counter.inc()
+                    
             if len(found_urls) >= batch_size:
                 publish_batch(channel, found_urls)
                 found_urls = []

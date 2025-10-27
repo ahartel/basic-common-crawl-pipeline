@@ -19,6 +19,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 batch_counter = Counter("worker_batches", "Number of consumed batches")
+urls_processed_counter = Counter("worker_urls_processed", "Total URLs processed")
+warc_records_counter = Counter("worker_warc_records", "WARC records processed")
+text_extraction_attempts = Counter("worker_text_extraction_attempts", "Text extraction attempts")
+text_extraction_success = Counter("worker_text_extraction_success", "Successfully extracted text")
 
 
 def process_batch(downloader: Downloader, ch, method, _properties, body):
@@ -26,14 +30,19 @@ def process_batch(downloader: Downloader, ch, method, _properties, body):
     batch = json.loads(body)
     
     for item in batch:
+        urls_processed_counter.inc()
         data = downloader.download_and_unzip(
             item["metadata"]["filename"],
             int(item["metadata"]["offset"]),
             int(item["metadata"]["length"]),
         )
         for record in WARCIterator(io.BytesIO(data)):
+            warc_records_counter.inc()
             if record.rec_type == "response":
-                _text = trafilatura.extract(record.content_stream().read())
+                text_extraction_attempts.inc()
+                text = trafilatura.extract(record.content_stream().read())
+                if text:
+                    text_extraction_success.inc()
                 # TODO: process text with constraints
     batch_counter.inc()
     logger.info("Processed batch successfully")
