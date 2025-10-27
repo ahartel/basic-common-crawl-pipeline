@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 import json
 import argparse
+import logging
+import os
 from typing import Any, Mapping, Sequence
 from prometheus_client import Counter, start_http_server
 
@@ -11,11 +13,18 @@ from commoncrawl import (
     CSVIndexReader,
     Downloader,
     IndexReader,
+    download_cluster_idx,
 )
 from rabbitmq import QUEUE_NAME, MessageQueueChannel, RabbitMQChannel
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
-BATCH_SIZE = 50
+BATCH_SIZE = int(os.getenv("BATCHER_BATCH_SIZE", os.getenv("BATCH_SIZE", "50")))
 
 batch_counter = Counter("batcher_batches", "Number of published batches")
 
@@ -23,7 +32,10 @@ batch_counter = Counter("batcher_batches", "Number of published batches")
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Batcher")
     parser.add_argument(
-        "--cluster-idx-filename", type=str, help="Input file path", required=True
+        "--cluster-idx-filename", 
+        type=str, 
+        help="Input file path", 
+        required=False
     )
     return parser.parse_args()
 
@@ -32,7 +44,7 @@ def publish_batch(
     channel: MessageQueueChannel,
     batch: Sequence[Mapping[str, Any]],
 ) -> None:
-    print("Pushing batch of size", len(batch))
+    logger.info("Pushing batch of size %d", len(batch))
     channel.basic_publish(
         exchange="",
         routing_key=QUEUE_NAME,
@@ -79,10 +91,24 @@ def process_index(
 
 def main() -> None:
     args = parse_args()
-    start_http_server(9000)
+    prometheus_port = int(os.getenv("BATCHER_METRICS_PORT", os.getenv("PROMETHEUS_PORT", "9000")))
+    start_http_server(prometheus_port)
+    
+    # Get cluster index filename from argument or environment variable
+    cluster_idx_filename = args.cluster_idx_filename or os.getenv("CLUSTER_IDX_FILENAME")
+    
+    if not cluster_idx_filename:
+        raise ValueError("cluster.idx filename required via --cluster-idx-filename or CLUSTER_IDX_FILENAME env var")
+    
+    # In production: auto-download if file doesn't exist
+    if not os.path.exists(cluster_idx_filename):
+        crawl_version = os.getenv("COMMONCRAWL_VERSION")
+        if crawl_version:
+            download_cluster_idx(crawl_version, cluster_idx_filename)
+    
     channel = RabbitMQChannel()
     downloader = CCDownloader(f"{BASE_URL}/{CRAWL_PATH}")
-    index_reader = CSVIndexReader(args.cluster_idx_filename)
+    index_reader = CSVIndexReader(cluster_idx_filename)
     process_index(index_reader, channel, downloader, BATCH_SIZE)
 
 

@@ -1,0 +1,35 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies for compilation
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    libxml2-dev \
+    libxslt-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install Python dependencies
+COPY python/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code from parent directories
+COPY python/worker.py .
+COPY python/commoncrawl.py .
+COPY python/rabbitmq.py .
+COPY python/minio_client.py .
+
+# Set default environment variables
+ENV PROMETHEUS_PORT=9001
+ENV RABBITMQ_HOST=rabbitmq
+ENV RABBITMQ_PORT=5672
+ENV BASE_URL=https://data.commoncrawl.org
+ENV CRAWL_PATH=cc-index/collections/CC-MAIN-2024-30/indexes
+
+# Expose Prometheus metrics port
+EXPOSE 9001
+
+# Run worker
+CMD ["python", "worker.py"]
+

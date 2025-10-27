@@ -3,3 +3,9 @@ target
 .autometrics
 venv
 cluster.idx
+
+.idea/
+
+python/.env
+
+*.pyc
