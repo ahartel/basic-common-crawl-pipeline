@@ -1,0 +1,8 @@
+pipeline:
+  lang: "en"
+  line_wise:
+    min_words: 5
+    max_upper_ratio: 0.4
+  document_length:
+    min_chars: 500
+    max_chars: 1000000

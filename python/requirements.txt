@@ -3,3 +3,9 @@ pika
 prometheus-client
 requests
 warcio
+minio
+langdetect
+pyyaml
+pycld2
+pandas
+pyarrow

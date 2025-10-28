@@ -3,10 +3,13 @@ import csv
 import gzip
 from typing import Generator, List, Optional
 import requests
+from prometheus_client import Counter
 
 
 CRAWL_PATH = "cc-index/collections/CC-MAIN-2024-30/indexes"
 BASE_URL = "https://data.commoncrawl.org"
+
+down_error_counter = Counter("download_errors", "Number of download errors")
 
 
 class Downloader(ABC):
@@ -20,11 +23,16 @@ class CCDownloader(Downloader):
         self.base_url = base_url
 
     def download_and_unzip(self, url: str, start: int, length: int) -> bytes:
-        headers = {"Range": f"bytes={start}-{start+length-1}"}
-        response = requests.get(f"{self.base_url}/{url}", headers=headers)
-        response.raise_for_status()
-        buffer = response.content
-        return gzip.decompress(buffer)
+        try:
+            headers = {"Range": f"bytes={start}-{start+length-1}"}
+            response = requests.get(f"{self.base_url}/{url}", headers=headers)
+            response.raise_for_status()
+            buffer = response.content
+            return gzip.decompress(buffer)
+        except requests.exceptions.RequestException as e:
+            down_error_counter.inc()
+            print(f"Error downloading {url}: {e}")
+            return None
 
 
 class IndexReader(ABC):

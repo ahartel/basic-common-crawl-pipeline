@@ -18,6 +18,7 @@ from rabbitmq import QUEUE_NAME, MessageQueueChannel, RabbitMQChannel
 BATCH_SIZE = 50
 
 batch_counter = Counter("batcher_batches", "Number of published batches")
+index_process_error_counter = Counter("index_process_errors", "Number of index processing errors")
 
 
 def parse_args() -> argparse.Namespace:
@@ -47,35 +48,41 @@ def process_index(
     downloader: Downloader,
     batch_size: int,
 ) -> None:
-    found_urls = []
-    for cdx_chunk in index:
-        data = downloader.download_and_unzip(
-            cdx_chunk[1], int(cdx_chunk[2]), int(cdx_chunk[3])
-        ).decode("utf-8")
-        for line in data.split("\n"):
-            if line == "":
-                continue
-            values = line.split(" ")
-            metadata = json.loads("".join(values[2:]))
-            if (
-                "languages" in metadata
-                and "eng" in metadata["languages"]
-                and metadata["status"] == "200"
-            ):
-                found_urls.append(
-                    {
-                        "surt_url": values[0],
-                        "timestamp": values[1],
-                        "metadata": metadata,
-                    }
-                )
-            if len(found_urls) >= batch_size:
-                publish_batch(channel, found_urls)
-                found_urls = []
+    try:
+        found_urls = []
+        for cdx_chunk in index:
+            data = downloader.download_and_unzip(
+                cdx_chunk[1], int(cdx_chunk[2]), int(cdx_chunk[3])
+            ).decode("utf-8")
 
-    if len(found_urls) > 0:
-        publish_batch(channel, found_urls)
+            data_lines = data.split("\n")
 
+            for line in data_lines:
+                if line == "":
+                    continue
+                values = line.split(" ")
+                metadata = json.loads("".join(values[2:]))
+                if (
+                    "languages" in metadata
+                    and "eng" in metadata["languages"]
+                    and metadata["status"] == "200"
+                ):
+                    found_urls.append(
+                        {
+                            "surt_url": values[0],
+                            "timestamp": values[1],
+                            "metadata": metadata,
+                        }
+                    )
+                if len(found_urls) >= batch_size:
+                    publish_batch(channel, found_urls)
+                    found_urls = []
+
+        if len(found_urls) > 0:
+            publish_batch(channel, found_urls)
+    except Exception as e:
+        index_process_error_counter.inc()
+        pass
 
 def main() -> None:
     args = parse_args()
