@@ -13,6 +13,14 @@ updates:
     commit-message:
       prefix: "deps"
       include: "scope"
+    groups:
+      # Group all patch and minor updates together
+      go-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
 
   # Rust dependencies
   - package-ecosystem: "cargo"
@@ -27,6 +35,14 @@ updates:
     commit-message:
       prefix: "deps"
       include: "scope"
+    groups:
+      # Group all patch and minor updates together
+      rust-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
 
   # Python dependencies
   - package-ecosystem: "pip"
@@ -41,3 +57,11 @@ updates:
     commit-message:
       prefix: "deps"
       include: "scope"
+    groups:
+      # Group all patch and minor updates together
+      python-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
