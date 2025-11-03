@@ -5,7 +5,7 @@ go 1.23.0
 require (
 	github.com/PuerkitoBio/goquery v1.10.3
 	github.com/prometheus/client_golang v1.19.0
-	github.com/rabbitmq/amqp091-go v1.9.0
+	github.com/rabbitmq/amqp091-go v1.10.0
 	github.com/slyrz/warc v0.0.0-20150806225202-a50edd19b690
 )
 
