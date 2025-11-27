@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.86"
 axum = "0.8.7"
-clap = { version = "4.5.52", features = ["derive"] }
+clap = { version = "4.5.53", features = ["derive"] }
 flate2 = "1.0.31"
 futures-util = "0.3.30"
 lapin = "3.7.2"
